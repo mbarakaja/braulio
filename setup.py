@@ -11,7 +11,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ ]
+requirements = ['Click']
 
 setup_requirements = ['pytest-runner', ]
 
@@ -41,4 +41,8 @@ setup(
     url='https://github.com/mbarakaja/braulio',
     version='0.0.0',
     zip_safe=False,
+    entry_points='''
+        [console_scripts]
+        brau=braulio.cli:cli
+    ''',
 )
