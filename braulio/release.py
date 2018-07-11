@@ -1,57 +1,66 @@
 import click
-from braulio.git import Version, git
+from braulio.git import get_tags, get_commits, add_commit, add_tag
 from braulio.changelog import update_changelog
+from braulio.version import get_next_version
 
 
-def release():
-    commits = git.get_commits(unreleased=True)
+def _organize_commits(commit_list):
+    by_action = {}
+    has_breaking_changes = False
 
-    if not commits:
+    for commit in commit_list:
+        if commit.action:
+
+            has_breaking_changes = (
+                has_breaking_changes or 'BREAKING CHANGE' in commit.message
+            )
+
+            action = commit.action
+            scope = commit.scope
+
+            if action not in by_action:
+                by_action[action] = {'scopeless': []}
+
+            if not scope:
+                by_action[action]['scopeless'].append(commit)
+                continue
+            else:
+                if scope not in by_action[action]:
+                    by_action[action][commit.scope] = []
+
+                by_action[action][scope].append(commit)
+
+    bump_type = 'major' if has_breaking_changes else \
+                'minor' if 'feat' in by_action else \
+                'patch'
+
+    return {
+        'bump_version_to': bump_type,
+        'by_action': by_action,
+    }
+
+
+def release(bump_version_to=None, y_flag=False):
+
+    commit_list = get_commits(unreleased=True)
+
+    if not commit_list:
         click.echo('Nothing to release')
         return False
 
-    has_major = []
-    has_minor = []
-    has_patch = []
-    commits_to_log = []
+    tag_list = get_tags()
+    commits = _organize_commits(commit_list)
+    bump_version_to = bump_version_to or commits['bump_version_to']
+    last_version = tag_list[0].version if tag_list else None
 
-    # Filter only relevant commits
-    for commit in commits:
-        if commit.action:
-            commits_to_log.append(commit)
+    new_version = get_next_version(bump_version_to, last_version)
 
-            has_patch.append(commit.action == 'fix')
-            has_minor.append(commit.action == 'feat')
-            has_major.append(
-                'BREAKING CHANGE' in commit.message
-                or 'BREAKING CHANGES' in commit.message
-            )
+    if y_flag or click.confirm('Continue?'):
 
-    has_major = any(has_major)
-    has_minor = any(has_minor)
-    has_patch = any(has_patch)
-    last_tag = git.tags[0] if git.tags else None
+        update_changelog(
+            version=new_version,
+            grouped_commits=commits['by_action'],
+        )
 
-    next_version = Version()
-
-    if last_tag:
-        next_version.major = last_tag.version.major
-        next_version.minor = last_tag.version.minor
-        next_version.patch = last_tag.version.patch
-
-    if has_major:
-        next_version.increase('major')
-
-    if not has_major and has_minor:
-        next_version.increase('minor')
-
-    if not has_major and not has_minor and has_patch:
-        next_version.increase('patch')
-
-    update_changelog(
-        version=next_version,
-        commits=commits_to_log,
-    )
-
-    git.add_commit(f'Release version {next_version.version}')
-    git.add_tag('v' + next_version.version)
+        add_commit(f'Release version {new_version.string}')
+        add_tag('v' + new_version.string)

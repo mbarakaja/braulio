@@ -1,7 +1,10 @@
 import pytest
+from unittest.mock import patch
 from datetime import date
-from unittest.mock import patch, call
+from pathlib import Path
+from click.testing import CliRunner
 from braulio.git import Commit, Version
+from braulio.release import _organize_commits
 from braulio.changelog import _make_title, _make_sublist, _make_list, \
     _make_release_markup, update_changelog
 
@@ -79,13 +82,15 @@ def test_make_list(commit_text_registry):
     )
 
 
-class Test_generate:
+class Test_make_release_markup:
 
-    def test_release_with_fixes_and_features(self, commit_registry):
-        commits = [commit for key, commit in commit_registry.items()]
+    def test_release_with_fixes_and_features(self, commit_list):
         version = Version(major=10, minor=3, patch=0)
-
-        markup = _make_release_markup(version, commits=commits)
+        commits = _organize_commits(commit_list)
+        markup = _make_release_markup(
+            version,
+            grouped_commits=commits['by_action'],
+        )
 
         assert markup == (
             f'10.3.0 ({str(date.today())})\n'
@@ -104,10 +109,14 @@ class Test_generate:
 
     def test_release_with_fixes(self, commit_registry):
         reg = commit_registry
-        commits = [reg['4d17c1a']]
+        commit_list = [reg['4d17c1a']]
+        commits = _organize_commits(commit_list)
         version = Version(major=10, minor=3, patch=0)
 
-        markup = _make_release_markup(version, commits=commits)
+        markup = _make_release_markup(
+            version,
+            grouped_commits=commits['by_action'],
+        )
 
         assert markup == (
             f'10.3.0 ({str(date.today())})\n'
@@ -119,10 +128,13 @@ class Test_generate:
 
     def test_release_with_features(self, commit_registry):
         reg = commit_registry
-        commits = [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']]
         version = Version(major=10, minor=3, patch=0)
-
-        markup = _make_release_markup(version, commits=commits)
+        commit_list = [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']]
+        commits = _organize_commits(commit_list)
+        markup = _make_release_markup(
+            version,
+            grouped_commits=commits['by_action'],
+        )
 
         assert markup == (
             f'10.3.0 ({str(date.today())})\n'
@@ -133,3 +145,52 @@ class Test_generate:
             '* music - Add more music please\n'
             '* cli - Add a cli tool\n\n'
         )
+
+
+class TestUpdateChangelog:
+
+    @patch('braulio.changelog.click.echo')
+    def test_missing_changelog_file(self, mocked_echo):
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            version = Version()
+
+            update_changelog(version, {})
+
+            mocked_echo.assert_called_with(
+                'Unable to find a changelog file\n'
+                'Run "$ brau init" to create one'
+            )
+
+    @patch('braulio.changelog._make_release_markup')
+    def test_write_to_changelog_file(
+        self, mock_make_release_markup
+    ):
+        mock_make_release_markup.return_value = 'New Content'
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            with open('CHANGELOG.rst', 'w') as f:
+                f.write(
+                    f'{_make_title("History")}'
+                    'Content'
+                )
+
+            version = Version()
+            organized_commits = {}
+
+            update_changelog(version, organized_commits)
+
+            text = Path('CHANGELOG.rst').read_text()
+
+            assert text == (
+                'History\n'
+                '=======\n\n'
+                'New Content'
+                'Content'
+            )
+
+            mock_make_release_markup.assert_called_with(
+                version, organized_commits
+            )

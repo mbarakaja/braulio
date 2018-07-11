@@ -35,28 +35,6 @@ def create_file():
     click.echo(f'{DEFAULT_FILE_NAME} created succesfully.')
 
 
-def _make_tree(commits):
-    tree = {}
-
-    for commit in commits:
-        action = commit.action
-        scope = commit.scope
-
-        if action not in tree:
-            tree[action] = {'scopeless': []}
-
-        if not scope:
-            tree[action]['scopeless'].append(commit)
-            continue
-        else:
-            if scope not in tree[action]:
-                tree[action][commit.scope] = []
-
-            tree[action][scope].append(commit)
-
-    return tree
-
-
 def _make_sublist(commits):
     markup = ''
 
@@ -85,33 +63,34 @@ def _make_list(scope_dict):
     return markup + '\n'
 
 
-def _make_release_markup(version, commits):
+def _make_release_markup(version, grouped_commits):
     today = str(date.today())
-    title = f'{version.version} ({today})'
+    title = f'{version.string} ({today})'
     markup = _make_title(title, level=2)
 
-    tree = _make_tree(commits)
-
-    if 'fix' in tree:
+    if 'fix' in grouped_commits:
         markup += _make_title('Bug Fixes', level=3)
-        markup += _make_list(tree['fix'])
+        markup += _make_list(grouped_commits['fix'])
 
-    if 'feat' in tree:
+    if 'feat' in grouped_commits:
         markup += _make_title('Features', level=3)
-        markup += _make_list(tree['feat'])
+        markup += _make_list(grouped_commits['feat'])
 
     return markup
 
 
-def update_changelog(version, commits):
+def update_changelog(version, grouped_commits):
     path = get_file_path()
 
     if not path:
-        click.echo('Unable to find a changelog file')
-        click.echo('Run "$ brau init" to create one')
+        message = (
+            'Unable to find a changelog file\n'
+            'Run "$ brau init" to create one'
+        )
+        click.echo(message)
         return
 
-    markup = _make_release_markup(version, commits)
+    markup = _make_release_markup(version, grouped_commits)
     lines = []
 
     with path.open() as f:

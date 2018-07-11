@@ -2,8 +2,8 @@ import pytest
 from subprocess import PIPE
 from unittest.mock import patch, Mock, call
 from braulio.git import _run_git_tag_command, _run_git_log_command, \
-    _get_tags, _get_commits, _run_command, add_tag, add_commit, \
-    Commit, Version, Tag, Git
+    get_tags, get_commits, _run_command, add_tag, add_commit, \
+    Commit, Tag
 
 
 parametrize = pytest.mark.parametrize
@@ -69,17 +69,17 @@ def test_add_commit(mocked_run_command):
         (True, ['git', 'log'], []),
     ]
 )
-@patch('braulio.git.git')
+@patch('braulio.git.get_tags')
 @patch('braulio.git._run_command')
 def test_run_git_log_command(
     mocked_run_command,
-    mocked_git,
+    mocked_get_tags,
     unreleased,
     command,
     tags
 ):
     mocked_run_command.return_value = 'Stdout text'
-    mocked_git.tags = tags
+    mocked_get_tags.return_value = tags
 
     result = _run_git_log_command(unreleased=unreleased)
 
@@ -93,7 +93,7 @@ class Test_get_commits:
     def test_get_all_commits(self, mock_run_git_log, fake_git_log_output):
         mock_run_git_log.return_value = fake_git_log_output
 
-        commits = _get_commits()
+        commits = get_commits()
 
         mock_run_git_log.assert_called_with(unreleased=False)
         assert len(commits) == 12
@@ -113,7 +113,7 @@ class Test_get_commits:
 
         mock_run_git_log.return_value = fake_git_log_output
 
-        commits = _get_commits(unreleased=True)
+        commits = get_commits(unreleased=True)
 
         mock_run_git_log.assert_called_with(unreleased=True)
         assert len(commits) == 12
@@ -123,42 +123,6 @@ class Test_get_commits:
 
         last = commits[-1]
         assert last.header == 'Add additional information (#26)'
-
-
-class TestVersion:
-
-    def test_constructor_without_arguments(self):
-        version = Version()
-
-        assert version.major == 0
-        assert version.minor == 0
-        assert version.patch == 0
-        assert version.version == '0.0.0'
-
-    def test_constructor_with_arguments(self):
-        version = Version(1, 2, 3)
-
-        assert version.major == 1
-        assert version.minor == 2
-        assert version.patch == 3
-        assert version.version == '1.2.3'
-
-    @parametrize(
-        'part, major, minor, patch, text_repr',
-        [
-            ('major', 2, 0, 0, '2.0.0'),
-            ('minor', 1, 3, 0, '1.3.0'),
-            ('patch', 1, 2, 4, '1.2.4'),
-        ]
-    )
-    def test_increase(self, part, major, minor, patch, text_repr):
-        version = Version(1, 2, 3)
-        version.increase(part=part)
-
-        assert version.major == major
-        assert version.minor == minor
-        assert version.patch == patch
-        assert version.version == text_repr
 
 
 @parametrize(
@@ -182,7 +146,7 @@ class Test_get_tags:
     @patch('braulio.git._run_git_tag_command')
     def test_without_tags(self, mock_run_git_tag):
         mock_run_git_tag.return_value = ''
-        tag_list = _get_tags()
+        tag_list = get_tags()
         assert tag_list == []
 
     @patch('braulio.git._run_git_tag_command')
@@ -196,7 +160,7 @@ class Test_get_tags:
             '2016-10-03      v0.0.6\n'
         )
 
-        tag_list = _get_tags()
+        tag_list = get_tags()
 
         mock_run_git_tag.assert_called()
 
@@ -249,7 +213,7 @@ class TestCommit:
         ['80a9e0e', '2f9be68'],
         ids=['no line break before header', 'without body'],
     )
-    def test_messages_with_invalid_body(self, commit_text_registry, short_hash):
+    def test_message_with_invalid_body(self, commit_text_registry, short_hash):
         text = commit_text_registry[short_hash]
         assert Commit(text).body is None
 
@@ -330,48 +294,3 @@ class TestCommit:
 
         assert commit.scope == scope
         assert commit.action == action
-
-
-class TestGit:
-
-    @patch('braulio.git._get_commits')
-    def test_commits_property(self, mocked_get_commits):
-        mocked_get_commits.return_value = [4, 5, 6]
-
-        _git = Git()
-        _git._commits = [1, 2, 3]
-
-        mocked_get_commits.assert_not_called()
-        assert _git.commits == [1, 2, 3]
-
-        _git = Git()
-        _git._commits = []
-        _git.commits == [4, 5, 6]
-        mocked_get_commits.assert_called_with()
-
-    @patch('braulio.git._get_tags')
-    def test_tags_property(self, mocked_get_tags):
-        mocked_get_tags.return_value = [4, 5, 6]
-
-        _git = Git()
-        _git._tags = [1, 2, 3]
-
-        mocked_get_tags.assert_not_called()
-        assert _git.tags == [1, 2, 3]
-
-        _git = Git()
-        _git._tags = []
-        _git.tags == [4, 5, 6]
-        mocked_get_tags.assert_called_with()
-
-    @patch('braulio.git._get_commits')
-    def test_get_commits(self, mocked_get_commits):
-        mocked_get_commits.return_value = [10, 11, 12]
-
-        _git = Git()
-
-        assert _git.get_commits() == [10, 11, 12]
-        mocked_get_commits.assert_called_with(unreleased=False)
-
-        assert _git.get_commits(True) == [10, 11, 12]
-        mocked_get_commits.assert_called_with(unreleased=True)

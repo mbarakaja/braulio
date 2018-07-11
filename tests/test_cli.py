@@ -1,10 +1,9 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from pathlib import Path
 from click.testing import CliRunner
 from braulio.cli import cli
 from braulio.git import Tag, Version
-from braulio.changelog import _make_title
 
 
 parametrize = pytest.mark.parametrize
@@ -51,7 +50,7 @@ class TestInit:
 
 class TestRelease:
 
-    @patch('braulio.git.git.get_commits', return_value=[])
+    @patch('braulio.release.get_commits', return_value=[])
     def test_no_commits(self, mocked_get_commits):
         runner = CliRunner()
 
@@ -60,84 +59,168 @@ class TestRelease:
         assert 'Nothing to release' in result.output
         mocked_get_commits.assert_called_with(unreleased=True)
 
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    def test_pass_no_to_confirmation_prompt(
+        self, mocked_update_changelog, mocked_add_commit, mocked_add_tag
+    ):
+        runner = CliRunner()
+
+        result = runner.invoke(cli, ['release'])
+
+        assert result.exit_code == 0
+        assert 'Continue? [y/N]' in result.output
+
+        mocked_update_changelog.assert_not_called()
+        mocked_add_commit.assert_not_called()
+        mocked_add_tag.assert_not_called()
+
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    def test_pass_yes_to_confirmation_prompt(
+        self, mocked_update_changelog, mocked_add_commit, mocked_add_tag
+    ):
+        runner = CliRunner()
+
+        result = runner.invoke(cli, ['release'], input='y')
+        assert result.exit_code == 0
+        assert 'Continue? [y/N]' in result.output
+
+        mocked_update_changelog.assert_called()
+        mocked_add_commit.assert_called()
+        mocked_add_tag.assert_called()
+
     @parametrize(
-        'short_hash_list, tags, xyz',
+        'option, tags, expected',
         [
-            (
-                ['eaedb93', '4d17c1a', '264af1b'],
-                [],
-                '0.0.1',
-            ),
-            (
-                ['eaedb93', 'ccaa185'],
-                [Tag('2015-11-18 v0.10.2'), Tag('2015-10-15 v0.10.1')],
-                '0.11.0',
-            ),
-            (
-                ['eaedb93', '8c8dcb7'],
-                [Tag('2015-11-18 v2.10.2'), Tag('2015-10-15 v2.10.1')],
-                '3.0.0',
-            ),
+            ('--major', [Tag('2015-10-15 v0.10.1')], '1.0.0',),
+            ('--minor', [Tag('2015-10-15 v0.10.1')], '0.11.0',),
+            ('--patch', [Tag('2015-10-15 v0.10.1')], '0.10.2',),
+            ('--major', [], '1.0.0',),
+            ('--minor', [], '0.1.0',),
+            ('--patch', [], '0.0.1',),
+            ('--bump=4.0.0', [Tag('2015-10-15 v2.0.1')], '4.0.0',),
+            ('--bump=3.0.0', [], '3.0.0',),
         ],
-        ids=['patch release', 'minor release', 'major release'],
     )
-    @patch('braulio.release.git')
-    def test_new_release_version(
-        self, mock_git, commit_registry, short_hash_list, xyz, tags
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.get_tags')
+    @patch('braulio.release.get_commits')
+    def test_manual_version_bump(
+        self,
+        mocked_get_commits,
+        mocked_get_tags,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        option,
+        tags,
+        expected,
+        commit_list,
     ):
-        mock_git.tags = tags
-        reg = commit_registry
-        mock_git.get_commits.return_value = [reg[h] for h in short_hash_list]
+        mocked_get_commits.return_value = commit_list
+        mocked_get_tags.return_value = tags
+
         runner = CliRunner()
+        result = runner.invoke(cli, ['release', option], input='y')
 
-        with runner.isolated_filesystem():
-            with open('HISTORY.rst', 'w') as f:
-                f.write('')
+        assert result.exit_code == 0
 
-            runner.invoke(cli, ['release'])
+        mocked_update_changelog.assert_called()
 
-            mock_git.add_commit.assert_called_with(f'Release version {xyz}')
-            mock_git.add_tag.assert_called_with(f'v{xyz}')
+        # Check what version was passed to update_changelog function
+        passed_args = mocked_update_changelog.call_args[1]
+        assert passed_args['version'] == Version(expected)
 
-    @patch('braulio.release.git')
-    def test_missing_changelog_file(self, mock_git, commit_list):
-        mock_git.get_commits.return_value = commit_list
-        runner = CliRunner()
+        mocked_add_commit.assert_called_with(f'Release version {expected}')
+        mocked_add_tag.assert_called_with(f'v{expected}')
 
-        with runner.isolated_filesystem():
-            result = runner.invoke(cli, ['release'])
-            assert result.output == (
-                'Unable to find a changelog file\n'
-                'Run "$ brau init" to create one\n'
-            )
-
-    @patch('braulio.release.git')
-    @patch('braulio.changelog._make_release_markup')
-    def test_write_to_changelog_file(
-        self, mock_make_release_markup,  mock_git, commit_list
+    @parametrize(
+        'hash_lst, tags, expected',
+        [
+            (['4d17c1a', '80a9e0e'], [Tag('2016-10-03 v0.7.6')], '0.7.7'),
+            (['4d17c1a', 'ccaa185'], [Tag('2016-10-03 v0.7.6')], '0.8.0'),
+            (['8c8dcb7', 'ccaa185'], [Tag('2016-10-03 v0.7.6')], '1.0.0'),
+            (['4d17c1a', '80a9e0e'], None, '0.0.1'),
+            (['4d17c1a', 'ccaa185'], None, '0.1.0'),
+            (['8c8dcb7', 'ccaa185'], None, '1.0.0'),
+        ],
+    )
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.get_tags')
+    @patch('braulio.release.get_commits')
+    def test_determine_next_version_from_commit_messages(
+        self,
+        mocked_get_commits,
+        mocked_get_tags,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        hash_lst,
+        tags,
+        expected,
+        commit_registry,
     ):
-        mock_git.get_commits.return_value = commit_list
-        mock_make_release_markup.return_value = 'New Content'
+        mocked_get_tags.return_value = tags
+        mocked_get_commits.return_value = [
+            commit_registry[short_hash] for short_hash in hash_lst
+        ]
+
         runner = CliRunner()
 
-        with runner.isolated_filesystem():
-            with open('CHANGELOG.rst', 'w') as f:
-                f.write(
-                    f'{_make_title("History")}'
-                    'Content'
-                )
+        result = runner.invoke(cli, ['release', '-y'])
 
-            runner.invoke(cli, ['release'])
+        assert result.exit_code == 0, result.exception
 
-            text = Path('CHANGELOG.rst').read_text()
+        mocked_update_changelog.assert_called()
 
-            assert text == (
-                'History\n'
-                '=======\n\n'
-                'New Content'
-                'Content'
-            )
+        # Check what version was passed to update_changelog function
+        passed_args = mocked_update_changelog.call_args[1]
+        assert passed_args['version'] == Version(expected)
 
-            mock_make_release_markup.assert_called()
-            mock_git.add_commit.assert_called()
-            mock_git.add_tag.assert_called()
+        mocked_add_commit.assert_called_with(f'Release version {expected}')
+        mocked_add_tag.assert_called_with(f'v{expected}')
+
+    @patch('braulio.release._organize_commits')
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.get_tags')
+    @patch('braulio.release.get_commits')
+    @patch('braulio.release.get_next_version')
+    def test_update_changelog(
+        self,
+        mocked_get_next_version,
+        mocked_get_commits,
+        mocked_get_tags,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        mocked_organize_commits,
+    ):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['release', '-y'])
+
+        assert result.exit_code == 0
+
+        mocked_get_commits.assert_called_with(unreleased=True)
+
+        mocked_organize_commits.assert_called_with(
+            mocked_get_commits()
+        )
+
+        mocked_get_next_version.assert_called_with(
+            mocked_organize_commits()['bump_version_to'],
+            mocked_get_tags()[0].version
+        )
+
+        mocked_update_changelog.assert_called_with(
+            version=mocked_get_next_version(),
+            grouped_commits=mocked_organize_commits()['by_action']
+        )
