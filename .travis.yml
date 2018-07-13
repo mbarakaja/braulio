@@ -1,25 +1,14 @@
-# Config file for automatic testing at travis-ci.org
-
 language: python
 python:
-  - 3.6
-
-# Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+- 3.6
 install: pip install -U tox-travis
-
-# Command to run tests, e.g. python setup.py test
 script: tox
-
-# Assuming you have installed the travis-ci CLI tool, after you
-# create the Github repo and add it to Travis, run the
-# following command to finish PyPI deployment setup:
-# $ travis encrypt --add deploy.password
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
   user: mbarakaja
   password:
-    secure: QuNMQ6zgk8B4K6bZ84b0pp6DB/MzhaUcR3+uVW/KDvbRyRDkoAHwhJre2Np0Hvh5Gla/Ko2swLviSoQTOgZ4E4oGsyuO7Kh8mAS8hSq6FiPDRt4ekelibfTCcQDtm71s8OTm+GJgS3bHMLMzawQwSyTfLec3qj67VYuWxSBPizOCkRR1KJDEHQDMK4hj4FqwmZ+LddMpRlktC40yM2Al82njP6GiPE9LfijrZ7o7TaYQ8ruhQom8OqEg8gkDRkxKMRVnOYeNfcthXwDq9OuG6nCmPze8m+hTeqeg7zJS0cwO7bsU1fv04zLBOBNsIv8EHS2sV4atxdqlr7qFPwl6W+ptKxiLV+7qYKGJrJzQ3MzTPNjjHnl6S7n44fWBjFF15olChKWWnKRGH6r2J0Gq6RzfdVfHY5mUcZ5MIiyviotIaz0JuZciz21AD23cawfEUxyDgq1pUKNG6uyK8f3OJ4FzKPIJbYSk69BdMOh25vj3PNyRc/yFi/FT1CrpD3wH2cSfCExnP/HzS29X8KmizKz9K60NBVUYF7B2KKAU1T+/mGsJzDqv7IywJ2aGCHiROD++I8s4dmB6PVs4y4KJIO7l78FQHQc2T0OLLCmzN2QoRwOJch08QdSFjib3QHKhtHoEPDh92L8fEM6ITNaDkZdd9ZOJTfpsAsN7iGzStnk=
+    secure: lCsbPvtrMqBzFq01i6SaLsnkoeIhQV8Iqz0n8+pqUPu6r26QKmMxIV6ZPr5ZzsJeaz8XlUgdbzwTK2xTM8NnUS/F7LFyy2hpQ+3JAXOMZdFLtpZ66CsU5EjP9uEpPdVYwBPcIdr4wceF02yiWSiuJ/vQ0/l24S7UwY62gKOG8ej6eNDZ2SwkHZcXy8xdWiDvzgGEWI79upMB0lFmfr/9OXMFlUoFwOO0HcnCZASLjx0yuXQCk2XgObDYBTb6nGLt3vFbso4NCClNCcVkDkyhTp15lT3Xq12Y7/F7CF6JMljC1TP80clD6QIW36FrP4DTBNo9+eroHy3jb02SNSlqj4dWOpROQH53zmMKB6sGTskBE+60bXVrJA+o9/ycnJJOkxb29Fh7rLWh/JH0AoE5nsYZs2Ekis94/agJltLA14AEc0ZIioemqNVp40xbfgPS14XZcEV0oFwO/y9qC+RlDcetIuswBKUuXgfxXQSlRpPspncEPdHCEu7gd81e36SX+7MJ0SUDNf0e/xICDZbu1AKqqY2jLgUil0sO9/YTder2rmXllMixz10D9cGODeWBzqQ3ri3RXiM6u8nEUSC6C61zH096CLnJbv1CweIp3Pj30qn5WgvlbLlV89IXZb6Si1t+TyZ1RAlsIElVL1m6n0N5GQY67wVnixEECiQMCSo=
   on:
     tags: true
     repo: mbarakaja/braulio
