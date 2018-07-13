@@ -40,10 +40,14 @@ def bump_callback(ctx, param, value):
               help='Patch version bump')
 @click.option('--bump', 'bump_version_to', callback=bump_callback,
               is_eager=True)
-@click.option('-y', is_flag=True, default=False)
-def release(bump_version_to, bump_type, y):
+@click.option('--commit/--no-commit', 'commit_flag', default=True)
+@click.option('--tag/--no-tag', 'tag_flag', default=True)
+@click.option('-y', 'y_flag', is_flag=True, default=False)
+def release(bump_version_to, bump_type, commit_flag, tag_flag, y_flag):
 
     _release(
         bump_version_to=bump_version_to or bump_type,
-        y_flag=y,
+        add_commit_flag=commit_flag,
+        add_tag_flag=tag_flag,
+        y_flag=y_flag,
     )

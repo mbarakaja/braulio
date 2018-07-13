@@ -224,3 +224,51 @@ class TestRelease:
             version=mocked_get_next_version(),
             grouped_commits=mocked_organize_commits()['by_action']
         )
+
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.get_tags', return_value=[])
+    @patch('braulio.release.get_commits')
+    def test_no_commit_flag(
+        self,
+        mocked_get_commits,
+        mocked_get_tags,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        commit_list,
+    ):
+        mocked_get_commits.return_value = commit_list
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ['release', '--no-commit', '-y'])
+
+        assert result.exit_code == 0
+
+        mocked_add_commit.assert_not_called()
+        mocked_add_tag.assert_called()
+
+    @patch('braulio.release.add_tag')
+    @patch('braulio.release.add_commit')
+    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.get_tags', return_value=[])
+    @patch('braulio.release.get_commits')
+    def test_no_tag_flag(
+        self,
+        mocked_get_commits,
+        mocked_get_tags,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        commit_list,
+    ):
+        mocked_get_commits.return_value = commit_list
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ['release', '--no-tag', '-y'])
+
+        assert result.exit_code == 0
+
+        mocked_add_commit.assert_called()
+        mocked_add_tag.assert_not_called()

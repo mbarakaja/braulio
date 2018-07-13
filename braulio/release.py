@@ -40,7 +40,9 @@ def _organize_commits(commit_list):
     }
 
 
-def release(bump_version_to=None, y_flag=False):
+def release(
+    bump_version_to=None, add_commit_flag=True, add_tag_flag=True, y_flag=False
+):
 
     commit_list = get_commits(unreleased=True)
 
@@ -62,5 +64,8 @@ def release(bump_version_to=None, y_flag=False):
             grouped_commits=commits['by_action'],
         )
 
-        add_commit(f'Release version {new_version.string}')
-        add_tag('v' + new_version.string)
+        if add_commit_flag:
+            add_commit(f'Release version {new_version.string}')
+
+        if add_tag_flag:
+            add_tag('v' + new_version.string)
