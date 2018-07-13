@@ -59,11 +59,16 @@ class TestRelease:
         assert 'Nothing to release' in result.output
         mocked_get_commits.assert_called_with(unreleased=True)
 
+    @patch('braulio.release.get_commits')
     @patch('braulio.release.add_tag')
     @patch('braulio.release.add_commit')
     @patch('braulio.release.update_changelog')
     def test_pass_no_to_confirmation_prompt(
-        self, mocked_update_changelog, mocked_add_commit, mocked_add_tag
+        self,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        mocked_get_commits
     ):
         runner = CliRunner()
 
@@ -76,11 +81,16 @@ class TestRelease:
         mocked_add_commit.assert_not_called()
         mocked_add_tag.assert_not_called()
 
+    @patch('braulio.release.get_commits')
     @patch('braulio.release.add_tag')
     @patch('braulio.release.add_commit')
     @patch('braulio.release.update_changelog')
     def test_pass_yes_to_confirmation_prompt(
-        self, mocked_update_changelog, mocked_add_commit, mocked_add_tag
+        self,
+        mocked_update_changelog,
+        mocked_add_commit,
+        mocked_add_tag,
+        mocked_get_commits,
     ):
         runner = CliRunner()
 
