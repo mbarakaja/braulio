@@ -1,6 +1,24 @@
+import os
 import pytest
 from pathlib import Path
 from braulio.git import _extract_commit_texts, Commit
+
+
+class IsolatedFilesystem:
+
+    def __init__(self, tmpdir):
+        self.tmpdir = tmpdir
+
+    def __enter__(self):
+        self.original_dir = self.tmpdir.chdir()
+
+    def __exit__(self, *args):
+        os.chdir(self.original_dir)
+
+
+@pytest.fixture
+def isolated_filesystem(tmpdir):
+    return IsolatedFilesystem(tmpdir)
 
 
 @pytest.fixture(scope='session')

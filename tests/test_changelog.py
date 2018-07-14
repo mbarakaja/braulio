@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch
 from datetime import date
 from pathlib import Path
-from click.testing import CliRunner
 from braulio.git import Commit, Version
 from braulio.release import _organize_commits
 from braulio.changelog import _make_title, _make_sublist, _make_list, \
@@ -150,10 +149,9 @@ class Test_make_release_markup:
 class TestUpdateChangelog:
 
     @patch('braulio.changelog.click.echo')
-    def test_missing_changelog_file(self, mocked_echo):
-        runner = CliRunner()
+    def test_missing_changelog_file(self, mocked_echo, isolated_filesystem):
 
-        with runner.isolated_filesystem():
+        with isolated_filesystem:
             version = Version()
 
             update_changelog(version, {})
@@ -165,12 +163,11 @@ class TestUpdateChangelog:
 
     @patch('braulio.changelog._make_release_markup')
     def test_write_to_changelog_file(
-        self, mock_make_release_markup
+        self, mock_make_release_markup, isolated_filesystem
     ):
         mock_make_release_markup.return_value = 'New Content'
-        runner = CliRunner()
 
-        with runner.isolated_filesystem():
+        with isolated_filesystem:
             with open('CHANGELOG.rst', 'w') as f:
                 f.write(
                     f'{_make_title("History")}'
