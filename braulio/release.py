@@ -1,5 +1,5 @@
 import click
-from braulio.git import get_tags, get_commits, add_commit, add_tag
+from braulio.git import Git
 from braulio.changelog import update_changelog
 from braulio.version import get_next_version
 
@@ -44,13 +44,15 @@ def release(
     bump_version_to=None, add_commit_flag=True, add_tag_flag=True, y_flag=False
 ):
 
-    commit_list = get_commits(unreleased=True)
+    git = Git()
+
+    commit_list = git.get_commits(unreleased=True)
 
     if not commit_list:
         click.echo('Nothing to release')
         return False
 
-    tag_list = get_tags()
+    tag_list = git.get_tags()
     commits = _organize_commits(commit_list)
     bump_version_to = bump_version_to or commits['bump_version_to']
     last_version = tag_list[0].version if tag_list else None
@@ -65,7 +67,7 @@ def release(
         )
 
         if add_commit_flag:
-            add_commit(f'Release version {new_version.string}')
+            git.add_commit(f'Release version {new_version.string}')
 
         if add_tag_flag:
-            add_tag('v' + new_version.string)
+            git.add_tag('v' + new_version.string)

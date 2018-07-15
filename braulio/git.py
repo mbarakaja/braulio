@@ -127,3 +127,18 @@ def get_commits(unreleased=False):
     commit_text_lst = _extract_commit_texts(git_log_text)
 
     return [Commit(commit_text) for commit_text in commit_text_lst]
+
+
+class Git:
+
+    def get_commits(self, unreleased=False):
+        return get_commits(unreleased=unreleased)
+
+    def get_tags(self):
+        return get_tags()
+
+    def add_commit(self, message):
+        add_commit(message)
+
+    def add_tag(self, name):
+        add_tag(name)

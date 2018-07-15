@@ -1,9 +1,9 @@
 import pytest
 from subprocess import PIPE
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, Mock, call, sentinel
 from braulio.git import _run_git_tag_command, _run_git_log_command, \
     get_tags, get_commits, _run_command, add_tag, add_commit, \
-    Commit, Tag
+    Git, Commit, Tag
 
 
 parametrize = pytest.mark.parametrize
@@ -294,3 +294,45 @@ class TestCommit:
 
         assert commit.scope == scope
         assert commit.action == action
+
+
+class TestGit:
+
+    @patch('braulio.git.get_commits')
+    def test_get_commits_method(self, mocked_get_commits):
+        git = Git()
+
+        commit_list = git.get_commits()
+        mocked_get_commits.assert_called_with(unreleased=False)
+        assert commit_list is mocked_get_commits()
+
+        mocked_get_commits.reset_mock()
+
+        commit_list = git.get_commits(unreleased=True)
+        mocked_get_commits.assert_called_with(unreleased=True)
+        assert commit_list is mocked_get_commits()
+
+    @patch('braulio.git.get_tags')
+    def test_get_tags_method(self, mocked_get_tags):
+        git = Git()
+
+        tag_list = git.get_tags()
+
+        mocked_get_tags.assert_called_with()
+        assert tag_list is mocked_get_tags()
+
+    @patch('braulio.git.add_commit')
+    def test_add_commit_method(self, mocked_add_commit):
+        git = Git()
+
+        git.add_commit('a message')
+
+        mocked_add_commit.assert_called_with('a message')
+
+    @patch('braulio.git.add_tag')
+    def test_add_tag_method(self, mocked_add_tag):
+        git = Git()
+
+        git.add_tag('v0.0.0')
+
+        mocked_add_tag.assert_called_with('v0.0.0')
