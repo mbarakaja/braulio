@@ -1,5 +1,6 @@
 import pytest
-from unittest.mock import patch, Mock
+from configparser import ConfigParser
+from unittest.mock import patch
 from pathlib import Path
 from click.testing import CliRunner
 from braulio.cli import cli
@@ -199,42 +200,68 @@ class TestRelease:
             grouped_commits=mock_organize_commits()['by_action']
         )
 
-    @patch('braulio.release.update_changelog')
-    @patch('braulio.release.Git', spec=True)
-    def test_no_commit_flag(
-        self,
-        MockGit,
-        mock_update_changelog,
-        commit_list,
-    ):
-        mock_git = MockGit()
-        mock_git.get_commits.return_value = commit_list
-        mock_git.get_tags.return_value = []
 
-        runner = CliRunner()
-        result = runner.invoke(cli, ['release', '--no-commit', '-y'])
+@parametrize(
+    'flag, config, called',
+    [
+        ([], {}, True,),
+        ([], {'commit': False}, False,),
+        (['--no-commit'], {'commit': True}, False,),
+        (['--commit'], {'commit': False}, True,),
+    ],
+)
+@patch('braulio.release.Git', spec=True)
+def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
+    """Test commit flag picked from CLI or configuration file"""
 
-        assert result.exit_code == 0
+    mock_git = MockGit()
+    runner = CliRunner()
 
-        mock_git.add_commit.assert_not_called()
-        mock_git.add_tag.assert_called()
+    with isolated_filesystem:
+        changelog_path = Path('HISTORY.rst')
+        changelog_path.touch()
 
-    @patch('braulio.release.update_changelog')
-    @patch('braulio.release.Git', spec=True)
-    def test_no_tag_flag(
-        self,
-        MockGit,
-        mock_update_changelog,
-        commit_list,
-    ):
-        mock_git = MockGit()
-        mock_git.get_commits.return_value = commit_list
-        mock_git.get_tags.return_value = []
+        with open('setup.cfg', 'w') as config_file:
+            config_parser = ConfigParser()
+            config_parser['braulio'] = config
+            config_parser.write(config_file)
 
-        runner = CliRunner()
-        result = runner.invoke(cli, ['release', '--no-tag', '-y'])
+        command = ['release'] + flag + ['-y']
+        result = runner.invoke(cli, command)
 
-        assert result.exit_code == 0
+    assert result.exit_code == 0
+    assert mock_git.add_tag.called is True
+    assert mock_git.add_commit.called is called
 
-        mock_git.add_commit.assert_called()
-        mock_git.add_tag.assert_not_called()
+
+@parametrize(
+    'flag, cfg_value, called',
+    [
+        ([], {}, True,),
+        ([], {'tag': False}, False,),
+        (['--no-tag'], {'tag': True}, False,),
+        (['--tag'], {'tag': False}, True,),
+    ],
+)
+@patch('braulio.release.Git', spec=True)
+def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
+    """Test tag flag picked from CLI or configuration file"""
+
+    mock_git = MockGit()
+    runner = CliRunner()
+
+    with isolated_filesystem:
+        changelog_path = Path('HISTORY.rst')
+        changelog_path.touch()
+
+        with open('setup.cfg', 'w') as config_file:
+            config_parser = ConfigParser()
+            config_parser['braulio'] = cfg_value
+            config_parser.write(config_file)
+
+        command = ['release'] + flag + ['-y']
+        result = runner.invoke(cli, command)
+
+    assert result.exit_code == 0
+    assert mock_git.add_tag.called is called
+    assert mock_git.add_commit.called is True

@@ -41,7 +41,10 @@ def _organize_commits(commit_list):
 
 
 def release(
-    bump_version_to=None, add_commit_flag=True, add_tag_flag=True, y_flag=False
+    bump_version_to=None,
+    add_commit_flag=True,
+    add_tag_flag=True,
+    confirm_flag=False
 ):
 
     git = Git()
@@ -59,7 +62,7 @@ def release(
 
     new_version = get_next_version(bump_version_to, last_version)
 
-    if y_flag or click.confirm('Continue?'):
+    if confirm_flag or click.confirm('Continue?'):
 
         update_changelog(
             version=new_version,

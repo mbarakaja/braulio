@@ -2,11 +2,22 @@ import click
 from braulio.version import validate_version_str
 from braulio.release import release as _release
 from braulio.changelog import get_file_path, create_file
+from braulio.config import get_config
 
 
 @click.group()
-def cli():
-    pass
+@click.pass_context
+def cli(ctx):
+
+    config = get_config()
+
+    ctx.default_map = {
+        'release': {
+            'tag_flag': config.tag,
+            'commit_flag': config.commit,
+            'confirm_flag': config.confirm,
+        }
+    }
 
 
 @cli.command()
@@ -42,12 +53,12 @@ def bump_callback(ctx, param, value):
               is_eager=True)
 @click.option('--commit/--no-commit', 'commit_flag', default=True)
 @click.option('--tag/--no-tag', 'tag_flag', default=True)
-@click.option('-y', 'y_flag', is_flag=True, default=False)
-def release(bump_version_to, bump_type, commit_flag, tag_flag, y_flag):
+@click.option('-y', 'confirm_flag', is_flag=True, default=False)
+def release(bump_version_to, bump_type, commit_flag, tag_flag, confirm_flag):
 
     _release(
         bump_version_to=bump_version_to or bump_type,
         add_commit_flag=commit_flag,
         add_tag_flag=tag_flag,
-        y_flag=y_flag,
+        confirm_flag=confirm_flag,
     )

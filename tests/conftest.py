@@ -1,6 +1,7 @@
 import os
 import pytest
 from pathlib import Path
+from configparser import ConfigParser
 from braulio.git import _extract_commit_texts, Commit
 
 
