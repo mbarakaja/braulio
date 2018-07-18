@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from braulio.git import Commit, Version
 from braulio.release import _organize_commits
-from braulio.changelog import _make_title, _make_sublist, _make_list, \
+from braulio.files import _make_title, _make_sublist, _make_list, \
     _make_release_markup, update_changelog
 
 
@@ -148,7 +148,7 @@ class Test_make_release_markup:
 
 class TestUpdateChangelog:
 
-    @patch('braulio.changelog.click.echo')
+    @patch('braulio.files.click.echo')
     def test_missing_changelog_file(self, mocked_echo, isolated_filesystem):
 
         with isolated_filesystem:
@@ -161,7 +161,7 @@ class TestUpdateChangelog:
                 'Run "$ brau init" to create one'
             )
 
-    @patch('braulio.changelog._make_release_markup')
+    @patch('braulio.files._make_release_markup')
     def test_write_to_changelog_file(
         self, mock_make_release_markup, isolated_filesystem
     ):

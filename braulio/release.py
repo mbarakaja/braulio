@@ -1,6 +1,6 @@
 import click
 from braulio.git import Git
-from braulio.changelog import update_changelog
+from braulio.files import update_changelog
 from braulio.version import get_next_version
 
 

@@ -1,7 +1,7 @@
 import click
 from braulio.version import validate_version_str
 from braulio.release import release as _release
-from braulio.changelog import get_file_path, create_file
+from braulio.files import get_file_path, create_file
 from braulio.config import get_config
 
 
