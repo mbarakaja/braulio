@@ -1,7 +1,7 @@
 import os
 import pytest
+from shutil import copytree
 from pathlib import Path
-from configparser import ConfigParser
 from braulio.git import _extract_commit_texts, Commit
 
 
@@ -15,6 +15,40 @@ class IsolatedFilesystem:
 
     def __exit__(self, *args):
         os.chdir(self.original_dir)
+
+
+class FakeRepository:
+
+    repository_dir = Path.cwd() / 'tests' / 'repos'
+
+    def __init__(self, tmpdir, repository_name):
+        self.tmpdir = tmpdir
+        self.temporal_dir = Path(tmpdir) / 'repo'
+        self.original_dir = Path.cwd()
+        self.repository_name = repository_name
+
+    def __enter__(self):
+        # Copy fake repository to temporal directory
+        copytree(
+            src=self.repository_dir / self.repository_name,
+            dst=self.temporal_dir
+        )
+
+        # Switch to temporal directory
+        os.chdir(self.temporal_dir)
+
+    def __exit__(self, *args):
+        # Switch back to original directory
+        os.chdir(self.original_dir)
+
+
+@pytest.fixture
+def fake_repository(tmpdir):
+
+    def _repository(repository_name):
+        return FakeRepository(tmpdir, repository_name)
+
+    return _repository
 
 
 @pytest.fixture

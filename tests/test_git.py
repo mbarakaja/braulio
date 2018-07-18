@@ -1,6 +1,6 @@
 import pytest
 from subprocess import PIPE
-from unittest.mock import patch, Mock, call, sentinel
+from unittest.mock import patch, Mock, call
 from braulio.git import _run_git_tag_command, _run_git_log_command, \
     get_tags, get_commits, _run_command, add_tag, add_commit, \
     Git, Commit, Tag

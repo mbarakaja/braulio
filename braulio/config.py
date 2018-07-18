@@ -10,6 +10,19 @@ class Config:
         self._tag = config.getboolean('braulio', 'tag')
         self._confirm = config.getboolean('braulio', 'confirm')
 
+        files_value = config.get('braulio', 'files').strip()
+
+        if files_value == '':
+            self._files = ()
+            return
+
+        if '\n' in files_value:
+            files_value = files_value.replace('\n', '')
+
+        file_path_list = files_value.split(',')
+
+        self._files = tuple(fp.strip() for fp in file_path_list)
+
     @property
     def commit(self):
         return self._commit
@@ -22,6 +35,10 @@ class Config:
     def confirm(self):
         return self._confirm
 
+    @property
+    def files(self):
+        return self._files
+
 
 DEFAULT_CONFIG = ConfigParser()
 DEFAULT_CONFIG.read_dict({
@@ -29,6 +46,7 @@ DEFAULT_CONFIG.read_dict({
         'commit': 'True',
         'tag': 'True',
         'confirm': 'False',
+        'files': '',
     }
 })
 

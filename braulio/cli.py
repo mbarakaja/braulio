@@ -42,6 +42,15 @@ def bump_callback(ctx, param, value):
     ctx.abort()
 
 
+def files_callback(ctx, param, value):
+    if value:
+        return value
+
+    config = get_config()
+
+    return config.files
+
+
 @cli.command()
 @click.option('--major', 'bump_type', flag_value='major',
               help='Major version bump')
@@ -54,11 +63,17 @@ def bump_callback(ctx, param, value):
 @click.option('--commit/--no-commit', 'commit_flag', default=True)
 @click.option('--tag/--no-tag', 'tag_flag', default=True)
 @click.option('-y', 'confirm_flag', is_flag=True, default=False)
-def release(bump_version_to, bump_type, commit_flag, tag_flag, confirm_flag):
+@click.argument('files', nargs=-1, type=click.Path(exists=True),
+                callback=files_callback)
+@click.pass_context
+def release(ctx, bump_version_to, bump_type, commit_flag, tag_flag,
+            confirm_flag, files):
 
     _release(
+        ctx,
         bump_version_to=bump_version_to or bump_type,
         add_commit_flag=commit_flag,
         add_tag_flag=tag_flag,
         confirm_flag=confirm_flag,
+        files=files,
     )

@@ -1,7 +1,7 @@
 import click
 from braulio.git import Git
-from braulio.files import update_changelog
-from braulio.version import get_next_version
+from braulio.files import update_changelog, update_files
+from braulio.version import Version, get_next_version
 
 
 def _organize_commits(commit_list):
@@ -41,10 +41,12 @@ def _organize_commits(commit_list):
 
 
 def release(
+    ctx,
     bump_version_to=None,
     add_commit_flag=True,
     add_tag_flag=True,
-    confirm_flag=False
+    confirm_flag=False,
+    files=(),
 ):
 
     git = Git()
@@ -58,9 +60,9 @@ def release(
     tag_list = git.get_tags()
     commits = _organize_commits(commit_list)
     bump_version_to = bump_version_to or commits['bump_version_to']
-    last_version = tag_list[0].version if tag_list else None
+    current_version = tag_list[0].version if tag_list else Version()
 
-    new_version = get_next_version(bump_version_to, last_version)
+    new_version = get_next_version(bump_version_to, current_version)
 
     if confirm_flag or click.confirm('Continue?'):
 
@@ -68,6 +70,12 @@ def release(
             version=new_version,
             grouped_commits=commits['by_action'],
         )
+
+        try:
+            update_files(files, str(current_version), str(new_version))
+        except ValueError as e:
+            click.echo(e)
+            ctx.abort()
 
         if add_commit_flag:
             git.add_commit(f'Release version {new_version.string}')

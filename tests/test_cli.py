@@ -200,6 +200,49 @@ class TestRelease:
             grouped_commits=mock_organize_commits()['by_action']
         )
 
+    @patch('braulio.release.Git')
+    @patch('braulio.release.update_files')
+    def test_files_argument_from_command_line(
+        self, mock_update_files, MockGit, fake_repository
+    ):
+
+        runner = CliRunner()
+        mock_git = MockGit()
+        mock_git.get_tags.return_value = []
+
+        with fake_repository('black'):
+            files = ['black/__init__.py', 'setup.py']
+            result = runner.invoke(cli, ['release', '-y'] + files)
+
+        assert result.exit_code == 0
+        mock_update_files.assert_called_with(
+            ('black/__init__.py', 'setup.py'),
+            '0.0.0',
+            '0.0.1'
+        )
+
+    @patch('braulio.release.Git')
+    @patch('braulio.release.update_files')
+    def test_files_argument_from_config_file(
+        self, mock_update_files, MockGit, fake_repository
+    ):
+
+        runner = CliRunner()
+        mock_git = MockGit()
+        mock_git.get_tags.return_value = []
+
+        with fake_repository('white'):
+            result = runner.invoke(cli, ['release', '-y'])
+
+        assert result.exit_code == 0
+        print(result.output)
+        return
+        mock_update_files.assert_called_with(
+            ('white/__init__.py', 'setup.py'),
+            '0.0.0',
+            '0.0.1'
+        )
+
 
 @parametrize(
     'flag, config, called',

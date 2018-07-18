@@ -1,3 +1,4 @@
+import re
 import click
 from datetime import date
 from pathlib import Path
@@ -101,3 +102,32 @@ def update_changelog(version, grouped_commits):
     bottom = ''.join(lines[3:])
 
     path.write_text(top + markup + bottom)
+
+
+version_pattern = re.compile("_?_?version_?_?\s?=\s?(?:'|\")")
+
+
+def update_files(paths, current_version, new_version):
+    path_list = [Path(p) for p in paths]
+
+    for path in path_list:
+        if not path.is_file():
+            click.echo(f'The file {path} is invalid or does not exist')
+
+        text = ''
+        string_found = False
+
+        with path.open() as f:
+            for line in f:
+                if version_pattern.search(line) and current_version in line:
+                    line = line.replace(current_version, new_version)
+                    string_found = True
+
+                text += line
+
+        if not string_found:
+            raise ValueError(
+                f'Unable to find a version string to update in "{path}"'
+            )
+
+        path.write_text(text)

@@ -5,7 +5,7 @@ from pathlib import Path
 from braulio.git import Commit, Version
 from braulio.release import _organize_commits
 from braulio.files import _make_title, _make_sublist, _make_list, \
-    _make_release_markup, update_changelog
+    _make_release_markup, update_changelog, update_files
 
 
 parametrize = pytest.mark.parametrize
@@ -191,3 +191,52 @@ class TestUpdateChangelog:
             mock_make_release_markup.assert_called_with(
                 version, organized_commits
             )
+
+
+class TestUpdateFiles:
+
+    def test_files_missing_version_string(self, fake_repository):
+        paths = ['setup.py', 'black/__init__.py']
+
+        with fake_repository('black'):
+            message = 'Unable to find a version string to update in "setup.py"'
+
+            with pytest.raises(ValueError, match=message):
+                update_files(paths, '4.0.0', '4.1.0')
+
+    def test_file_update(self, fake_repository):
+        paths = ['setup.py', 'black/__init__.py']
+
+        with fake_repository('black'):
+
+            update_files(paths, '4.1.3', '5.0.0')
+
+            __init__file = (Path.cwd() / 'black' / '__init__.py').read_text()
+            setup_file = (Path.cwd() / 'setup.py').read_text()
+
+        assert setup_file == (
+            "from setuptools import setup\n"
+            "\n"
+            "setup(\n"
+            "    name='black',\n"
+            "    author='Mr. Black',\n"
+            "    description='Jus an example',\n"
+            "    version='5.0.0',\n"
+            "    zip_safe=False,\n"
+            ")\n"
+        )
+
+        assert __init__file == (
+            "'''\n"
+            "    Black project\n"
+            "    ~~~~~~~~~~~~~\n"
+            "'''\n"
+            "\n"
+            "__author__ = 'Mr. Black'\n"
+            "__email__ = 'black@example.test'\n"
+            "__version__ = '5.0.0'\n"
+            "\n"
+            "\n"
+            "def example():\n"
+            "    pass\n"
+        )
