@@ -46,6 +46,7 @@ def release(
     add_commit_flag=True,
     add_tag_flag=True,
     confirm_flag=False,
+    changelog_file=None,
     files=(),
 ):
 
@@ -66,10 +67,20 @@ def release(
 
     if confirm_flag or click.confirm('Continue?'):
 
-        update_changelog(
-            version=new_version,
-            grouped_commits=commits['by_action'],
-        )
+        try:
+            update_changelog(
+                changelog_file,
+                version=new_version,
+                grouped_commits=commits['by_action'],
+            )
+        except FileNotFoundError:
+            mark = click.style('✗', fg='red', bold=True)
+            filename = click.style(changelog_file.name, fg='blue', bold=True)
+            click.echo(
+                f' {mark} Unable to find {filename}\n'
+                '   Run "$ brau init" to create one'
+            )
+            ctx.abort()
 
         try:
             update_files(files, str(current_version), str(new_version))
@@ -78,7 +89,11 @@ def release(
             ctx.abort()
 
         if add_commit_flag:
-            git.add_commit(f'Release version {new_version.string}')
+            files = [str(changelog_file)] + list(files)
+            git.add_commit(
+                f'Release version {new_version.string}',
+                files=files
+            )
 
         if add_tag_flag:
             git.add_tag('v' + new_version.string)

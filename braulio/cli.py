@@ -1,4 +1,5 @@
 import click
+from pathlib import Path
 from braulio.version import validate_version_str
 from braulio.release import release as _release
 from braulio.files import get_file_path, create_file
@@ -48,8 +49,18 @@ def files_callback(ctx, param, value):
         return value
 
     config = ctx.obj
-
     return config.files
+
+
+def changelog_file_callback(ctx, param, value):
+    '''Return --changelog-file input as Path object if provided, otherwise
+    Config.changelog_file.'''
+
+    if value:
+        return Path(value)
+
+    config = ctx.obj
+    return config.changelog_file
 
 
 @cli.command()
@@ -63,12 +74,16 @@ def files_callback(ctx, param, value):
               is_eager=True)
 @click.option('--commit/--no-commit', 'commit_flag', default=True)
 @click.option('--tag/--no-tag', 'tag_flag', default=True)
+@click.option('--changelog-file', 'changelog_file',
+              type=click.Path(exists=True),
+              callback=changelog_file_callback,
+              help='Specify where to digest the changelog content')
 @click.option('-y', 'confirm_flag', is_flag=True, default=False)
 @click.argument('files', nargs=-1, type=click.Path(exists=True),
                 callback=files_callback)
 @click.pass_context
 def release(ctx, bump_version_to, bump_type, commit_flag, tag_flag,
-            confirm_flag, files):
+            confirm_flag, changelog_file, files):
 
     _release(
         ctx,
@@ -76,5 +91,6 @@ def release(ctx, bump_version_to, bump_type, commit_flag, tag_flag,
         add_commit_flag=commit_flag,
         add_tag_flag=tag_flag,
         confirm_flag=confirm_flag,
+        changelog_file=changelog_file,
         files=files,
     )

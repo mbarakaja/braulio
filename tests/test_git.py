@@ -49,11 +49,11 @@ def test_add_tag(mocked_run_command):
 
 @patch('braulio.git._run_command')
 def test_add_commit(mocked_run_command):
-    add_commit('A message')
+    add_commit('A message', ['CHANGELOG.rst'])
 
     assert mocked_run_command.call_count == 2
     assert mocked_run_command.call_args_list[0] == call(
-        ['git', 'add', 'HISTORY.rst'],
+        ['git', 'add', 'CHANGELOG.rst'],
     )
     assert mocked_run_command.call_args_list[1] == call(
         ['git', 'commit', '-m', '"A message"'],
@@ -325,9 +325,9 @@ class TestGit:
     def test_add_commit_method(self, mocked_add_commit):
         git = Git()
 
-        git.add_commit('a message')
+        git.add_commit('a message', ['module.py'])
 
-        mocked_add_commit.assert_called_with('a message')
+        mocked_add_commit.assert_called_with('a message', ['module.py'])
 
     @patch('braulio.git.add_tag')
     def test_add_tag_method(self, mocked_add_tag):

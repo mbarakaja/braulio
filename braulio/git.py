@@ -39,8 +39,8 @@ def add_tag(tag_name):
     return _run_command(['git', 'tag', '-a', name, '-m', '""'])
 
 
-def add_commit(message):
-    _run_command(['git', 'add', 'HISTORY.rst'])
+def add_commit(message, files):
+    _run_command(['git', 'add'] + files)
     _run_command(['git', 'commit', '-m', f'"{message}"'])
 
 
@@ -137,8 +137,8 @@ class Git:
     def get_tags(self):
         return get_tags()
 
-    def add_commit(self, message):
-        add_commit(message)
+    def add_commit(self, message, files):
+        add_commit(message, files)
 
     def add_tag(self, name):
         add_tag(name)

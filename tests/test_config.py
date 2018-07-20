@@ -18,6 +18,7 @@ class TestConfig:
         assert config.commit is True
         assert config.confirm is False
         assert config.files == ()
+        assert config.changelog_file == Path('HISTORY.rst')
 
     def test_config_file_with_not_braulio_section(self, isolated_filesystem):
         config_file_content = (

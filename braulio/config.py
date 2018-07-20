@@ -1,5 +1,6 @@
 from pathlib import Path
 from configparser import ConfigParser
+from braulio.files import DEFAULT_CHANGELOG
 
 
 DEFAULT_CONFIG = ConfigParser()
@@ -8,6 +9,7 @@ DEFAULT_CONFIG.read_dict({
         'commit': 'True',
         'tag': 'True',
         'confirm': 'False',
+        'changelog_file': DEFAULT_CHANGELOG,
         'files': '',
     }
 })
@@ -23,6 +25,8 @@ class Config:
         self._commit = config.getboolean('braulio', 'commit')
         self._tag = config.getboolean('braulio', 'tag')
         self._confirm = config.getboolean('braulio', 'confirm')
+        changelog_path = config.get('braulio', 'changelog_file').strip()
+        self._changelog_file = Path(changelog_path)
 
         files_value = config.get('braulio', 'files').strip()
 
@@ -61,6 +65,10 @@ class Config:
     @property
     def confirm(self):
         return self._confirm
+
+    @property
+    def changelog_file(self):
+        return self._changelog_file
 
     @property
     def files(self):

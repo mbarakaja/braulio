@@ -148,19 +148,6 @@ class Test_make_release_markup:
 
 class TestUpdateChangelog:
 
-    @patch('braulio.files.click.echo')
-    def test_missing_changelog_file(self, mocked_echo, isolated_filesystem):
-
-        with isolated_filesystem:
-            version = Version()
-
-            update_changelog(version, {})
-
-            mocked_echo.assert_called_with(
-                'Unable to find a changelog file\n'
-                'Run "$ brau init" to create one'
-            )
-
     @patch('braulio.files._make_release_markup')
     def test_write_to_changelog_file(
         self, mock_make_release_markup, isolated_filesystem
@@ -176,8 +163,9 @@ class TestUpdateChangelog:
 
             version = Version()
             organized_commits = {}
+            path = Path.cwd() / 'CHANGELOG.rst'
 
-            update_changelog(version, organized_commits)
+            update_changelog(path, version, organized_commits)
 
             text = Path('CHANGELOG.rst').read_text()
 

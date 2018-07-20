@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 file_names = ('HISTORY.rst', 'CHANGELOG.rst',)
-DEFAULT_FILE_NAME = file_names[0]
+DEFAULT_CHANGELOG = file_names[0]
 
 
 def get_file_path():
@@ -26,14 +26,14 @@ def _make_title(title, level=1):
 
 
 def create_file():
-    path = (Path.cwd() / DEFAULT_FILE_NAME)
+    path = (Path.cwd() / DEFAULT_CHANGELOG)
     path.touch()
 
     path.write_text(
         _make_title('History')
     )
 
-    click.echo(f'{DEFAULT_FILE_NAME} created succesfully.')
+    click.echo(f'{DEFAULT_CHANGELOG} created succesfully.')
 
 
 def _make_sublist(commits):
@@ -80,16 +80,7 @@ def _make_release_markup(version, grouped_commits):
     return markup
 
 
-def update_changelog(version, grouped_commits):
-    path = get_file_path()
-
-    if not path:
-        message = (
-            'Unable to find a changelog file\n'
-            'Run "$ brau init" to create one'
-        )
-        click.echo(message)
-        return
+def update_changelog(path, version, grouped_commits):
 
     markup = _make_release_markup(version, grouped_commits)
     lines = []

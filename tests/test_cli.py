@@ -121,7 +121,10 @@ class TestRelease:
         passed_args = mock_update_changelog.call_args[1]
         assert passed_args['version'] == Version(expected)
 
-        mock_git.add_commit.assert_called_with(f'Release version {expected}')
+        mock_git.add_commit.assert_called_with(
+            f'Release version {expected}',
+            files=['HISTORY.rst'],
+        )
         mock_git.add_tag.assert_called_with(f'v{expected}')
 
     @parametrize(
@@ -164,7 +167,10 @@ class TestRelease:
         passed_args = mocked_update_changelog.call_args[1]
         assert passed_args['version'] == Version(expected)
 
-        mock_git.add_commit.assert_called_with(f'Release version {expected}')
+        mock_git.add_commit.assert_called_with(
+            f'Release version {expected}',
+            files=['HISTORY.rst'],
+        )
         mock_git.add_tag.assert_called_with(f'v{expected}')
 
     @patch('braulio.release._organize_commits')
@@ -196,9 +202,26 @@ class TestRelease:
         )
 
         mock_update_changelog.assert_called_with(
+            Path('HISTORY.rst'),
             version=mock_get_next_version(),
             grouped_commits=mock_organize_commits()['by_action']
         )
+
+    @patch('braulio.release.Git')
+    def test_changelog_not_found(self, MockGit):
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+
+            result = runner.invoke(cli, ['release', '-y'])
+
+            assert result.exit_code == 1, result.exc_info
+            assert 'Unable to find HISTORY.rst' in result.output
+            assert 'Run "$ brau init" to create one' in result.output
+
+            mock_git = MockGit()
+            mock_git.add_commit.assert_not_called()
+            mock_git.add_tag.assert_not_called()
 
     @patch('braulio.release.Git')
     @patch('braulio.release.update_files')
@@ -214,7 +237,7 @@ class TestRelease:
             files = ['black/__init__.py', 'setup.py']
             result = runner.invoke(cli, ['release', '-y'] + files)
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.exception
         mock_update_files.assert_called_with(
             ('black/__init__.py', 'setup.py'),
             '0.0.0',
@@ -235,12 +258,29 @@ class TestRelease:
             result = runner.invoke(cli, ['release', '-y'])
 
         assert result.exit_code == 0
-        print(result.output)
-        return
         mock_update_files.assert_called_with(
             ('white/__init__.py', 'setup.py'),
             '0.0.0',
             '0.0.1'
+        )
+
+    @patch('braulio.release.Git')
+    @patch('braulio.release.update_files')
+    def test_added_files_to_release_commit(
+        self, mock_update_files, MockGit, fake_repository
+    ):
+
+        runner = CliRunner()
+        mock_git = MockGit()
+        mock_git.get_tags.return_value = []
+
+        with fake_repository('white'):
+            result = runner.invoke(cli, ['release', '--commit', '-y'])
+
+        assert result.exit_code == 0
+        mock_git.add_commit.assert_called_with(
+            'Release version 0.0.1',
+            files=['HISTORY.rst', 'white/__init__.py', 'setup.py']
         )
 
 
