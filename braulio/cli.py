@@ -2,14 +2,15 @@ import click
 from braulio.version import validate_version_str
 from braulio.release import release as _release
 from braulio.files import get_file_path, create_file
-from braulio.config import get_config
+from braulio.config import Config
 
 
 @click.group()
 @click.pass_context
 def cli(ctx):
 
-    config = get_config()
+    config = Config()
+    ctx.obj = config
 
     ctx.default_map = {
         'release': {
@@ -46,7 +47,7 @@ def files_callback(ctx, param, value):
     if value:
         return value
 
-    config = get_config()
+    config = ctx.obj
 
     return config.files
 

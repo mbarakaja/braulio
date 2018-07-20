@@ -12,6 +12,7 @@ class IsolatedFilesystem:
 
     def __enter__(self):
         self.original_dir = self.tmpdir.chdir()
+        return self
 
     def __exit__(self, *args):
         os.chdir(self.original_dir)
