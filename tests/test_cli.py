@@ -48,22 +48,42 @@ class TestInit:
 
 class TestRelease:
 
-    @patch('braulio.release.Git', spec=True)
-    def test_no_commits(self, MockGit):
+    @parametrize(
+        'tag_list, from_arg',
+        [
+            ([], None),
+            ([Tag('v0.2.0')], 'v0.2.0'),
+            ([Tag('v0.3.3'), Tag('v0.3.2')], 'v0.3.3'),
+        ]
+    )
+    @patch('braulio.release.Git', autospec=True)
+    def test_call_to_git_log_method(self, MockGit, tag_list, from_arg):
         mock_git = MockGit()
-        mock_git.get_commits.return_value = []
+        mock_git.tags = tag_list
+        mock_git.log.return_value = []
         runner = CliRunner()
 
         result = runner.invoke(cli, ['release'])
 
         assert 'Nothing to release' in result.output
-        mock_git.get_commits.assert_called_with(unreleased=True)
-        mock_git.add_commit.assert_not_called()
-        mock_git.add_tag.assert_not_called()
+        mock_git.log.assert_called_with(_from=from_arg)
+
+    @patch('braulio.release.Git', autospec=True)
+    def test_no_commits(self, MockGit):
+        mock_git = MockGit()
+        mock_git.log.return_value = []
+        runner = CliRunner()
+
+        result = runner.invoke(cli, ['release'])
+
+        assert 'Nothing to release' in result.output
+
+        mock_git.commit.assert_not_called()
+        mock_git.tag.assert_not_called()
 
     @parametrize('_input', ['y', 'n'])
     @patch('braulio.release.update_changelog')
-    @patch('braulio.release.Git', spec=True)
+    @patch('braulio.release.Git', autospec=True)
     def test_confirmation_prompt(self, MockGit, mock_update_changelog, _input):
         runner = CliRunner()
 
@@ -73,14 +93,11 @@ class TestRelease:
 
         mock_git = MockGit()
 
-        if _input == 'y':
-            mock_update_changelog.assert_called()
-            mock_git.add_commit.assert_called()
-            mock_git.add_tag.assert_called()
-        else:
-            mock_git = MockGit()
-            mock_git.add_commit.assert_not_called()
-            mock_git.add_tag.assert_not_called()
+        called = True if _input == 'y' else False
+
+        assert mock_update_changelog.called is called
+        assert mock_git.commit.called is called
+        assert mock_git.tag.called is called
 
     @parametrize(
         'option, tags, expected',
@@ -95,20 +112,13 @@ class TestRelease:
             ('--bump=3.0.0', [], '3.0.0',),
         ],
     )
-    @patch('braulio.release.update_changelog')
-    @patch('braulio.release.Git', spec=True)
+    @patch('braulio.release.update_changelog', autospec=True)
+    @patch('braulio.release.Git', autospec=True)
     def test_manual_version_bump(
-        self,
-        MockGit,
-        mock_update_changelog,
-        option,
-        tags,
-        expected,
-        commit_list,
-    ):
+            self, MockGit, mock_update_changelog, option, tags, expected):
+
         mock_git = MockGit()
-        mock_git.get_commits.return_value = commit_list
-        mock_git.get_tags.return_value = tags
+        mock_git.tags = tags
 
         runner = CliRunner()
         result = runner.invoke(cli, ['release', option], input='y')
@@ -121,11 +131,11 @@ class TestRelease:
         passed_args = mock_update_changelog.call_args[1]
         assert passed_args['version'] == Version(expected)
 
-        mock_git.add_commit.assert_called_with(
+        mock_git.commit.assert_called_with(
             f'Release version {expected}',
             files=['HISTORY.rst'],
         )
-        mock_git.add_tag.assert_called_with(f'v{expected}')
+        mock_git.tag.assert_called_with(f'v{expected}')
 
     @parametrize(
         'hash_lst, tags, expected',
@@ -138,8 +148,8 @@ class TestRelease:
             (['8c8dcb7', 'ccaa185'], None, '1.0.0'),
         ],
     )
-    @patch('braulio.release.update_changelog')
-    @patch('braulio.release.Git', spec=True)
+    @patch('braulio.release.update_changelog', autospec=True)
+    @patch('braulio.release.Git', autospec=True)
     def test_determine_next_version_from_commit_messages(
         self,
         MockGit,
@@ -150,8 +160,8 @@ class TestRelease:
         commit_registry,
     ):
         mock_git = MockGit()
-        mock_git.get_tags.return_value = tags
-        mock_git.get_commits.return_value = [
+        mock_git.tags = tags
+        mock_git.log.return_value = [
             commit_registry[short_hash] for short_hash in hash_lst
         ]
 
@@ -167,17 +177,17 @@ class TestRelease:
         passed_args = mocked_update_changelog.call_args[1]
         assert passed_args['version'] == Version(expected)
 
-        mock_git.add_commit.assert_called_with(
+        mock_git.commit.assert_called_with(
             f'Release version {expected}',
             files=['HISTORY.rst'],
         )
-        mock_git.add_tag.assert_called_with(f'v{expected}')
+        mock_git.tag.assert_called_with(f'v{expected}')
 
     @patch('braulio.release._organize_commits')
     @patch('braulio.release.update_changelog')
     @patch('braulio.release.get_next_version')
-    @patch('braulio.release.Git', spec=True)
-    def test_update_changelog(
+    @patch('braulio.release.Git', autospec=True)
+    def test_call_to_update_changelog(
         self,
         MockGit,
         mock_get_next_version,
@@ -190,15 +200,15 @@ class TestRelease:
         assert result.exit_code == 0
 
         mock_git = MockGit()
-        mock_git.get_commits.assert_called_with(unreleased=True)
+        mock_git.log.assert_called()
 
         mock_organize_commits.assert_called_with(
-            mock_git.get_commits()
+            mock_git.log()
         )
 
         mock_get_next_version.assert_called_with(
             mock_organize_commits()['bump_version_to'],
-            mock_git.get_tags()[0].version
+            mock_git.tags[0].version
         )
 
         mock_update_changelog.assert_called_with(
@@ -207,7 +217,7 @@ class TestRelease:
             grouped_commits=mock_organize_commits()['by_action']
         )
 
-    @patch('braulio.release.Git')
+    @patch('braulio.release.Git', autospec=True)
     def test_changelog_not_found(self, MockGit):
         runner = CliRunner()
 
@@ -220,18 +230,18 @@ class TestRelease:
             assert 'Run "$ brau init" to create one' in result.output
 
             mock_git = MockGit()
-            mock_git.add_commit.assert_not_called()
-            mock_git.add_tag.assert_not_called()
+            mock_git.commit.assert_not_called()
+            mock_git.tag.assert_not_called()
 
-    @patch('braulio.release.Git')
-    @patch('braulio.release.update_files')
+    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.release.update_files', autospec=True)
     def test_files_argument_from_command_line(
         self, mock_update_files, MockGit, fake_repository
     ):
 
         runner = CliRunner()
         mock_git = MockGit()
-        mock_git.get_tags.return_value = []
+        mock_git.tags = []
 
         with fake_repository('black'):
             files = ['black/__init__.py', 'setup.py']
@@ -244,15 +254,15 @@ class TestRelease:
             '0.0.1'
         )
 
-    @patch('braulio.release.Git')
-    @patch('braulio.release.update_files')
+    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.release.update_files', autospec=True)
     def test_files_argument_from_config_file(
         self, mock_update_files, MockGit, fake_repository
     ):
 
         runner = CliRunner()
         mock_git = MockGit()
-        mock_git.get_tags.return_value = []
+        mock_git.tags = []
 
         with fake_repository('white'):
             result = runner.invoke(cli, ['release', '-y'])
@@ -264,21 +274,21 @@ class TestRelease:
             '0.0.1'
         )
 
-    @patch('braulio.release.Git')
-    @patch('braulio.release.update_files')
+    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.release.update_files', autospec=True)
     def test_added_files_to_release_commit(
         self, mock_update_files, MockGit, fake_repository
     ):
 
         runner = CliRunner()
         mock_git = MockGit()
-        mock_git.get_tags.return_value = []
+        mock_git.tags = []
 
         with fake_repository('white'):
             result = runner.invoke(cli, ['release', '--commit', '-y'])
 
         assert result.exit_code == 0
-        mock_git.add_commit.assert_called_with(
+        mock_git.commit.assert_called_with(
             'Release version 0.0.1',
             files=['HISTORY.rst', 'white/__init__.py', 'setup.py']
         )
@@ -293,7 +303,7 @@ class TestRelease:
         (['--commit'], {'commit': False}, True,),
     ],
 )
-@patch('braulio.release.Git', spec=True)
+@patch('braulio.release.Git', autospec=True)
 def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
     """Test commit flag picked from CLI or configuration file"""
 
@@ -301,8 +311,7 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
     runner = CliRunner()
 
     with isolated_filesystem:
-        changelog_path = Path('HISTORY.rst')
-        changelog_path.touch()
+        Path('HISTORY.rst').touch()
 
         with open('setup.cfg', 'w') as config_file:
             config_parser = ConfigParser()
@@ -313,8 +322,8 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
         result = runner.invoke(cli, command)
 
     assert result.exit_code == 0
-    assert mock_git.add_tag.called is True
-    assert mock_git.add_commit.called is called
+    assert mock_git.tag.called is True
+    assert mock_git.commit.called is called
 
 
 @parametrize(
@@ -326,7 +335,7 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
         (['--tag'], {'tag': False}, True,),
     ],
 )
-@patch('braulio.release.Git', spec=True)
+@patch('braulio.release.Git', autospec=True)
 def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
     """Test tag flag picked from CLI or configuration file"""
 
@@ -334,8 +343,7 @@ def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
     runner = CliRunner()
 
     with isolated_filesystem:
-        changelog_path = Path('HISTORY.rst')
-        changelog_path.touch()
+        Path('HISTORY.rst').touch()
 
         with open('setup.cfg', 'w') as config_file:
             config_parser = ConfigParser()
@@ -346,5 +354,5 @@ def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
         result = runner.invoke(cli, command)
 
     assert result.exit_code == 0
-    assert mock_git.add_tag.called is called
-    assert mock_git.add_commit.called is True
+    assert mock_git.tag.called is called
+    assert mock_git.commit.called is True

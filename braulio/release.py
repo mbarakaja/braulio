@@ -52,16 +52,16 @@ def release(
 
     git = Git()
 
-    commit_list = git.get_commits(unreleased=True)
+    last_tag = git.tags[0].name if git.tags else None
+    commit_list = git.log(_from=last_tag)
 
     if not commit_list:
         click.echo('Nothing to release')
         return False
 
-    tag_list = git.get_tags()
     commits = _organize_commits(commit_list)
     bump_version_to = bump_version_to or commits['bump_version_to']
-    current_version = tag_list[0].version if tag_list else Version()
+    current_version = git.tags[0].version if git.tags else Version()
 
     new_version = get_next_version(bump_version_to, current_version)
 
@@ -90,10 +90,10 @@ def release(
 
         if add_commit_flag:
             files = [str(changelog_file)] + list(files)
-            git.add_commit(
+            git.commit(
                 f'Release version {new_version.string}',
-                files=files
+                files=files,
             )
 
         if add_tag_flag:
-            git.add_tag('v' + new_version.string)
+            git.tag('v' + new_version.string)

@@ -1,128 +1,32 @@
 import pytest
-from subprocess import PIPE
-from unittest.mock import patch, Mock, call
-from braulio.git import _run_git_tag_command, _run_git_log_command, \
-    get_tags, get_commits, _run_command, add_tag, add_commit, \
-    Git, Commit, Tag
+from subprocess import CalledProcessError, PIPE
+from unittest.mock import patch
+from braulio.git import _run_command, Git, Commit, Tag
 
 
 parametrize = pytest.mark.parametrize
 
 
-@patch('braulio.git.run')
-def test_run_command(mocked_run):
-    mocked_capture = Mock()
-    mocked_capture.stdout.decode.return_value = 'output value'
-    mocked_run.return_value = mocked_capture
+class TestRunCommand:
 
-    output = _run_command(['command', 'subcomand'])
+    @patch('braulio.git.run')
+    def test_call_to_subprocess_run(self, mocked_run):
 
-    assert output == 'output value'
-    mocked_run.assert_called_with(['command', 'subcomand'], stdout=PIPE)
+        output = _run_command(['command', 'subcomand'])
 
+        mocked_run.assert_called_with(
+            ['command', 'subcomand'],
+            stdout=PIPE,
+            stderr=PIPE,
+            check=True,
+        )
 
-@patch('braulio.git._run_command')
-def test_run_git_tag(mocked_run_command):
-    mocked_run_command.return_value = 'Stdout text'
+        assert output == mocked_run().stdout.decode()
 
-    result = _run_git_tag_command()
-
-    mocked_run_command.assert_called_with(
-        [
-            'git',
-            'tag',
-            '--sort=creatordate',
-            '--format=%(creatordate:short)%09%(refname:strip=2)',
-        ],
-    )
-    assert result == 'Stdout text'
-
-
-@patch('braulio.git._run_command')
-def test_add_tag(mocked_run_command):
-    add_tag('tagname')
-
-    mocked_run_command.assert_called_with(
-        ['git', 'tag', '-a', 'tagname', '-m', '""'],
-    )
-
-
-@patch('braulio.git._run_command')
-def test_add_commit(mocked_run_command):
-    add_commit('A message', ['CHANGELOG.rst'])
-
-    assert mocked_run_command.call_count == 2
-    assert mocked_run_command.call_args_list[0] == call(
-        ['git', 'add', 'CHANGELOG.rst'],
-    )
-    assert mocked_run_command.call_args_list[1] == call(
-        ['git', 'commit', '-m', '"A message"'],
-    )
-
-
-@parametrize(
-    'unreleased, command, tags',
-    [
-        (False, ['git', 'log'], [Tag('2015-10-15 v0.0.1')]),
-        (False, ['git', 'log'], []),
-        (True, ['git', 'log', 'v0.0.1..HEAD'], [Tag('2015-10-15 v0.0.1')]),
-        (True, ['git', 'log'], []),
-    ]
-)
-@patch('braulio.git.get_tags')
-@patch('braulio.git._run_command')
-def test_run_git_log_command(
-    mocked_run_command,
-    mocked_get_tags,
-    unreleased,
-    command,
-    tags
-):
-    mocked_run_command.return_value = 'Stdout text'
-    mocked_get_tags.return_value = tags
-
-    result = _run_git_log_command(unreleased=unreleased)
-
-    mocked_run_command.assert_called_with(command)
-    assert result == 'Stdout text'
-
-
-class Test_get_commits:
-
-    @patch('braulio.git._run_git_log_command')
-    def test_get_all_commits(self, mock_run_git_log, fake_git_log_output):
-        mock_run_git_log.return_value = fake_git_log_output
-
-        commits = get_commits()
-
-        mock_run_git_log.assert_called_with(unreleased=False)
-        assert len(commits) == 12
-
-        first = commits[0]
-        assert first.header == 'Fix lorem ipsum dolor sit amet'
-
-        last = commits[-1]
-        assert last.header == 'Add additional information (#26)'
-
-    @patch('braulio.git._run_git_log_command')
-    def test_get_unreleased_commits(
-        self,
-        mock_run_git_log,
-        fake_git_log_output
-    ):
-
-        mock_run_git_log.return_value = fake_git_log_output
-
-        commits = get_commits(unreleased=True)
-
-        mock_run_git_log.assert_called_with(unreleased=True)
-        assert len(commits) == 12
-
-        first = commits[0]
-        assert first.header == 'Fix lorem ipsum dolor sit amet'
-
-        last = commits[-1]
-        assert last.header == 'Add additional information (#26)'
+    def test_non_zero_exit_code(self, isolated_filesystem):
+        with isolated_filesystem:
+            with pytest.raises(CalledProcessError):
+                _run_command(['git', 'status'])
 
 
 @parametrize(
@@ -141,38 +45,7 @@ def test_tag_class(text, date, name):
     assert tag.date == date
 
 
-class Test_get_tags:
-
-    @patch('braulio.git._run_git_tag_command')
-    def test_without_tags(self, mock_run_git_tag):
-        mock_run_git_tag.return_value = ''
-        tag_list = get_tags()
-        assert tag_list == []
-
-    @patch('braulio.git._run_git_tag_command')
-    def test_with_tags(self, mock_run_git_tag):
-        mock_run_git_tag.return_value = (
-            '2015-10-15      v0.0.1\n'
-            '2015-11-18      v0.0.2\n'
-            '2016-02-26      v0.0.3\n'
-            '2016-03-22      v0.0.4\n'
-            '2016-07-06      v0.0.5\n'
-            '2016-10-03      v0.0.6\n'
-        )
-
-        tag_list = get_tags()
-
-        mock_run_git_tag.assert_called()
-
-        for _tag in tag_list:
-            assert type(_tag) == Tag
-
-        assert len(tag_list) == 6
-        assert tag_list[0].name == 'v0.0.6'
-        assert tag_list[5].name == 'v0.0.1'
-
-
-class TestCommit:
+class TestCommitClass:
 
     @parametrize(
         'short_hash, expected',
@@ -296,43 +169,144 @@ class TestCommit:
         assert commit.action == action
 
 
-class TestGit:
+class TestGitAdd:
 
-    @patch('braulio.git.get_commits')
-    def test_get_commits_method(self, mocked_get_commits):
+    @parametrize(
+        'files, expected',
+        [
+            (['module.py'], ('module.py',)),
+            (['module.py', 'folder/file.py'], ('module.py', 'folder/file.py'))
+        ],
+    )
+    @patch('braulio.git._run_command', autospec=True)
+    def test_run_command_call(self, mocked_run_command, files, expected):
+        git = Git()
+        git.add(*files)
+
+        command = ('git', 'add')
+        mocked_run_command.assert_called_with(command + expected)
+
+    def test_when_provided_files_does_not_exits(self):
         git = Git()
 
-        commit_list = git.get_commits()
-        mocked_get_commits.assert_called_with(unreleased=False)
-        assert commit_list is mocked_get_commits()
+        error = 'No such file or directory: this_does_not_exist.py'
+        with pytest.raises(FileNotFoundError, match=error):
+            git.add('this_does_not_exist.py')
 
-        mocked_get_commits.reset_mock()
 
-        commit_list = git.get_commits(unreleased=True)
-        mocked_get_commits.assert_called_with(unreleased=True)
-        assert commit_list is mocked_get_commits()
+class TestGitCommit:
 
-    @patch('braulio.git.get_tags')
-    def test_get_tags_method(self, mocked_get_tags):
+    @patch('braulio.git._run_command', autospec=True)
+    def test_call_to_run_command(self, mocked_run_command):
         git = Git()
+        git.commit('A message')
 
-        tag_list = git.get_tags()
+        command = ['git', 'commit', '-m', '"A message"']
+        mocked_run_command.assert_called_with(command)
 
-        mocked_get_tags.assert_called_with()
-        assert tag_list is mocked_get_tags()
-
-    @patch('braulio.git.add_commit')
-    def test_add_commit_method(self, mocked_add_commit):
+    @patch('braulio.git._run_command', autospec=True)
+    @patch('braulio.git.Git.add', autospec=True)
+    def test_pass_files_to_commit(self, mocked_git_add, mocked_run_command):
         git = Git()
+        git.commit('A good message', files=['file1.py', 'file2.py'])
 
-        git.add_commit('a message', ['module.py'])
+        # When autospec is used on a class method, the self parameter
+        # must be passed to too.
+        git.add.assert_called_with(git, 'file1.py', 'file2.py')
 
-        mocked_add_commit.assert_called_with('a message', ['module.py'])
+        command = ['git', 'commit', '-m', '"A good message"']
+        mocked_run_command.assert_called_with(command)
 
-    @patch('braulio.git.add_tag')
-    def test_add_tag_method(self, mocked_add_tag):
+
+class TestGitLog:
+
+    @patch('braulio.git._run_command', autospec=True)
+    def test_log_all_commits(self, mocked_run_command, fake_git_log_output):
+        mocked_run_command.return_value = fake_git_log_output
+
         git = Git()
+        commits = git.log()
 
-        git.add_tag('v0.0.0')
+        mocked_run_command.assert_called_with(['git', 'log'])
+        assert len(commits) == 12
+        assert isinstance(commits[0], Commit)
 
-        mocked_add_tag.assert_called_with('v0.0.0')
+        first = commits[0]
+        assert first.header == 'Fix lorem ipsum dolor sit amet'
+
+        last = commits[-1]
+        assert last.header == 'Add additional information (#26)'
+
+    @parametrize(
+        'f, t, revision_range',
+        [
+            (None, None, []),
+            (None, 'tag2', []),
+            ('tag1', None, ['tag1..HEAD']),
+            ('tag1', 'tag2', ['tag1..tag2']),
+        ]
+    )
+    @patch('braulio.git._run_command', return_value='', autospec=True)
+    def test_log_range(self, mocked_run_command, f, t, revision_range):
+
+        git = Git()
+        git.log(_from=f, to=t)
+
+        mocked_run_command.assert_called_with(['git', 'log'] + revision_range)
+
+
+git_tag_output = (
+    '2015-10-15      v0.0.1\n'
+    '2015-11-18      v0.0.2\n'
+    '2016-02-26      v0.0.3\n'
+    '2016-03-22      v0.0.4\n'
+    '2016-07-06      v0.0.5\n'
+    '2016-10-03      v0.0.6\n'
+)
+
+
+class TestGitTag:
+
+    @parametrize(
+        'command_output, expected',
+        [
+            ('', 0),
+            ('  ', 0),
+            ('\n', 0),
+            (git_tag_output, 6)
+        ]
+    )
+    @patch('braulio.git._run_command', autospec=True)
+    def test_get_tags(self, mocked_run_command, command_output, expected):
+        mocked_run_command.return_value = command_output
+
+        git = Git()
+        lst = git.tag()
+
+        mocked_run_command.assert_called_with(
+            [
+                'git',
+                'tag',
+                '-l',
+                '--sort=creatordate',
+                '--format=%(creatordate:short)%09%(refname:strip=2)',
+            ],
+        )
+
+        assert len(lst) == expected
+
+        if expected > 0:
+            for _tag in lst:
+                assert type(_tag) == Tag
+
+            assert lst[0].name == 'v0.0.6'
+            assert lst[5].name == 'v0.0.1'
+
+    @patch('braulio.git._run_command', autospec=True)
+    def test_add_tag(self, mocked_run_command):
+        git = Git()
+        git.tag('tagname')
+
+        mocked_run_command.assert_called_with(
+            ['git', 'tag', '-a', 'tagname', '-m', '""'],
+        )

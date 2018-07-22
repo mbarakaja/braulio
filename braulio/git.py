@@ -1,5 +1,6 @@
 import re
-from subprocess import run, PIPE
+from pathlib import Path
+from subprocess import run, PIPE, CalledProcessError
 from braulio.version import Version
 
 hash_pattern = re.compile('(?<=commit )\w{40}$', re.M)
@@ -7,7 +8,7 @@ task_pattern = re.compile('!\w+:\w*')
 
 
 def _run_command(command):
-    captured = run(command, stdout=PIPE)
+    captured = run(command, stdout=PIPE, stderr=PIPE, check=True)
     return captured.stdout.decode()
 
 
@@ -19,45 +20,6 @@ def _run_git_tag_command():
         '--format=%(creatordate:short)%09%(refname:strip=2)',
     ]
     return _run_command(command)
-
-
-def _run_git_log_command(unreleased=False):
-    command = ['git', 'log']
-
-    if unreleased:
-        tag_list = get_tags()
-
-        if tag_list:
-            last_tag = tag_list[0].name
-            command.append(f'{last_tag}..HEAD')
-
-    return _run_command(command)
-
-
-def add_tag(tag_name):
-    name = f'{tag_name}'
-    return _run_command(['git', 'tag', '-a', name, '-m', '""'])
-
-
-def add_commit(message, files):
-    _run_command(['git', 'add'] + files)
-    _run_command(['git', 'commit', '-m', f'"{message}"'])
-
-
-def get_tags():
-
-    tags_text = _run_git_tag_command()
-
-    if tags_text == '':
-        return []
-
-    if tags_text[-1] == '\n':
-        tags_text = tags_text[:-1]
-
-    tag_text_list = tags_text.split('\n')
-    tag_list = [Tag(text) for text in tag_text_list]
-
-    return list(reversed(tag_list))
 
 
 class Tag:
@@ -122,23 +84,71 @@ def _extract_commit_texts(git_log_text):
     return re.findall(patter, git_log_text)
 
 
-def get_commits(unreleased=False):
-    git_log_text = _run_git_log_command(unreleased=unreleased)
-    commit_text_lst = _extract_commit_texts(git_log_text)
-
-    return [Commit(commit_text) for commit_text in commit_text_lst]
-
-
 class Git:
 
-    def get_commits(self, unreleased=False):
-        return get_commits(unreleased=unreleased)
+    def add(self, *files):
+        """Add one or more files to the index running git-add."""
 
-    def get_tags(self):
-        return get_tags()
+        try:
+            _run_command(('git', 'add') + files)
+        except CalledProcessError:
+            # Only if the command fails we check if the files
+            # exist, because git-add most of the time fails when
+            # the provided files are not found.
+            for f in files:
+                if not Path(f).exists():
+                    raise FileNotFoundError(f'No such file or directory: {f}')
 
-    def add_commit(self, message, files):
-        add_commit(message, files)
+    def commit(self, message, files=None):
+        """Run git-commit."""
 
-    def add_tag(self, name):
-        add_tag(name)
+        if files:
+            self.add(*files)
+
+        return _run_command(['git', 'commit', '-m', f'"{message}"'])
+
+    def log(self, _from=None, to=None):
+        """Run git-log."""
+
+        command = ['git', 'log']
+
+        if _from:
+            to = 'HEAD' if not to else to
+            revision_range = f'{_from}..{to}'
+            command.append(revision_range)
+
+        git_log_text = _run_command(command)
+        commit_text_lst = _extract_commit_texts(git_log_text)
+
+        return [Commit(commit_text) for commit_text in commit_text_lst]
+
+    def tag(self, name=None):
+        """Create and list tag objects running git-tag command"""
+
+        command = ['git', 'tag']
+
+        if not name:
+            command.extend([
+                '-l',
+                '--sort=creatordate',
+                '--format=%(creatordate:short)%09%(refname:strip=2)',
+            ])
+
+            command_output = _run_command(command).strip()
+
+            if command_output == '':
+                return []
+
+            tag_text_list = command_output.split('\n')
+            tag_list = [Tag(text) for text in tag_text_list]
+
+            return list(reversed(tag_list))
+
+        command.extend(['-a', name, '-m', '""'])
+        return _run_command(command)
+
+    @property
+    def tags(self):
+        if not hasattr(self, '_tag_list'):
+            self._tag_list = self.tag()
+        return self._tag_list
