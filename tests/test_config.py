@@ -1,7 +1,8 @@
 import pytest
 from configparser import ConfigParser
 from pathlib import Path
-from braulio.config import Config
+from click.testing import CliRunner
+from braulio.config import Config, update_config_file
 
 
 parametrize = pytest.mark.parametrize
@@ -116,3 +117,38 @@ class TestConfig:
         assert config.tag is expected['tag']
         assert config.commit is expected['commit']
         assert config.confirm is expected['confirm']
+
+
+class TestUpdateConfigFile:
+    def test_empty_directory(self, isolated_filesystem):
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            setup_cfg_path = Path.cwd() / 'setup.cfg'
+
+            update_config_file('option1', 'value1')
+
+            assert setup_cfg_path.exists()
+
+            config_parser = ConfigParser()
+            config_parser.read('setup.cfg')
+            assert config_parser.has_section('braulio')
+            assert config_parser.get('braulio', 'option1') == 'value1'
+
+    def test_setup_cfg_exists(self, isolated_filesystem):
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            setup_cfg_path = Path.cwd() / 'setup.cfg'
+            setup_cfg_path.write_text(
+                '[section1]\n'
+                'option1 = value1\n'
+                'option2 = value2\n'
+            )
+
+            update_config_file('option3', 'value3')
+
+            config_parser = ConfigParser()
+            config_parser.read('setup.cfg')
+            assert config_parser.has_section('braulio')
+            assert config_parser.get('braulio', 'option3') == 'value3'

@@ -1,3 +1,4 @@
+import click
 from pathlib import Path
 from configparser import ConfigParser
 from braulio.files import DEFAULT_CHANGELOG
@@ -73,3 +74,25 @@ class Config:
     @property
     def files(self):
         return self._files
+
+
+def update_config_file(option, value):
+    path = Path.cwd() / 'setup.cfg'
+    setup_config = ConfigParser()
+
+    if not path.exists():
+        path.touch()
+
+    setup_config.read(path)
+
+    if not setup_config.has_section('braulio'):
+        setup_config.add_section('braulio')
+
+    setup_config.set('braulio', option, value)
+
+    with path.open('w') as f:
+        setup_config.write(f)
+
+    mark = click.style('✓', fg='green', bold=True)
+    filename = click.style('setup.cfg', bold=True, fg='blue')
+    click.echo(f' {mark} Updated {filename} {option} option with {value}')

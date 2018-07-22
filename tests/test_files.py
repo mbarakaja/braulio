@@ -4,11 +4,23 @@ from datetime import date
 from pathlib import Path
 from braulio.git import Commit, Version
 from braulio.release import _organize_commits
-from braulio.files import _make_title, _make_sublist, _make_list, \
-    _make_release_markup, update_changelog, update_files
+from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES, \
+    _make_title, _make_sublist, _make_list, _make_release_markup, \
+    update_changelog, update_files
 
 
 parametrize = pytest.mark.parametrize
+
+
+def test_default_changelog():
+    assert DEFAULT_CHANGELOG == 'HISTORY.rst'
+
+
+def test_known_changelog_files():
+    assert len(KNOWN_CHANGELOG_FILES) == 3
+    assert 'HISTORY.rst' in KNOWN_CHANGELOG_FILES
+    assert 'CHANGELOG.rst' in KNOWN_CHANGELOG_FILES
+    assert 'CHANGES.rst' in KNOWN_CHANGELOG_FILES
 
 
 @parametrize(

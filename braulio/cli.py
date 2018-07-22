@@ -1,9 +1,11 @@
 import click
 from pathlib import Path
+from click import style
 from braulio.version import validate_version_str
 from braulio.release import release as _release
-from braulio.files import get_file_path, create_file
-from braulio.config import Config
+from braulio.config import Config, update_config_file
+from braulio.files import find_changelog_file, create_changelog_file, \
+    DEFAULT_CHANGELOG
 
 
 @click.group()
@@ -23,18 +25,35 @@ def cli(ctx):
 
 
 @cli.command()
-def init():
-    click.echo('Initializing changelog')
+@click.option('--changelog-file', 'changelog_name',
+              help='A name for the changelog file to be created')
+def init(changelog_name):
 
-    file_path = get_file_path()
+    changelog_path = find_changelog_file()
+    create_changelog_flag = True
+    mark = style('?', fg='blue', bold=True)
 
-    if not file_path:
-        msg = 'No changelog file was found. Do you want to create a new one?'
+    if not changelog_name:
+        if changelog_path:
+            filename = style(changelog_path.name, fg='blue', bold=True)
+            message = (
+                f' {mark} {filename} was found.'
+                ' Is this the changelog file?'
+            )
 
-        if click.confirm(msg):
-            create_file()
-    else:
-        click.echo(f'{file_path.name} file found')
+            if click.confirm(message):
+                changelog_name = changelog_path.name
+                create_changelog_flag = False
+
+        if create_changelog_flag:
+            message = f' {mark} Enter a name for the changelog:'
+            changelog_name = click.prompt(message, default=DEFAULT_CHANGELOG)
+
+    if create_changelog_flag:
+        create_changelog_file(changelog_name)
+
+    if changelog_name and create_changelog_flag:
+        update_config_file('changelog_file', changelog_name)
 
 
 def bump_callback(ctx, param, value):

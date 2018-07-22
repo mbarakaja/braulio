@@ -4,36 +4,33 @@ from datetime import date
 from pathlib import Path
 
 
-file_names = ('HISTORY.rst', 'CHANGELOG.rst',)
-DEFAULT_CHANGELOG = file_names[0]
+KNOWN_CHANGELOG_FILES = ('HISTORY.rst', 'CHANGELOG.rst', 'CHANGES.rst')
+DEFAULT_CHANGELOG = KNOWN_CHANGELOG_FILES[0]
 
 
-def get_file_path():
-
-    for file_name in file_names:
+def find_changelog_file():
+    for file_name in KNOWN_CHANGELOG_FILES:
         path = Path.cwd() / file_name
 
         if path.is_file():
             return path
-
     return None
+
+
+def create_changelog_file(name=None):
+    file_name = name or DEFAULT_CHANGELOG
+    path = (Path.cwd() / file_name)
+    path.touch()
+    path.write_text(_make_title('History'))
+
+    mark = click.style('✓', fg='green')
+    click.echo(f' {mark} {file_name} created succesfully.')
 
 
 def _make_title(title, level=1):
     underlines = ['=', '-', '~']
     underline = underlines[level - 1] * len(title)
     return f'{title}\n{underline}\n\n'
-
-
-def create_file():
-    path = (Path.cwd() / DEFAULT_CHANGELOG)
-    path.touch()
-
-    path.write_text(
-        _make_title('History')
-    )
-
-    click.echo(f'{DEFAULT_CHANGELOG} created succesfully.')
 
 
 def _make_sublist(commits):
@@ -81,7 +78,6 @@ def _make_release_markup(version, grouped_commits):
 
 
 def update_changelog(path, version, grouped_commits):
-
     markup = _make_release_markup(version, grouped_commits)
     lines = []
 
