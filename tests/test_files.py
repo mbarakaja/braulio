@@ -5,8 +5,8 @@ from pathlib import Path
 from braulio.git import Commit, Version
 from braulio.release import _organize_commits
 from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES, \
-    _make_title, _make_sublist, _make_list, _make_release_markup, \
-    update_changelog, update_files
+    _render_title, _render_subtitle, _render_list, _render_release, \
+    update_chglog, update_files, is_title, _split_chglog
 
 
 parametrize = pytest.mark.parametrize
@@ -31,12 +31,12 @@ def test_known_changelog_files():
         (3, 'Title\n~~~~~\n\n'),
     ],
 )
-def test_make_title(level, expected):
-    output = _make_title('Title', level)
+def test_render_title(level, expected):
+    output = _render_title('Title', level)
     assert output == expected
 
 
-def test_make_sublist(commit_text_registry):
+def test_render_sublist(commit_text_registry):
     reg = commit_text_registry
     commits = [
         Commit(reg['80a9e0e']),
@@ -44,7 +44,7 @@ def test_make_sublist(commit_text_registry):
         Commit(reg['eaedb93']),
     ]
 
-    markup = _make_sublist(commits)
+    markup = _render_subtitle(commits)
 
     assert markup == (
         f'  - {commits[0].subject}\n'
@@ -53,7 +53,7 @@ def test_make_sublist(commit_text_registry):
     )
 
 
-def test_make_list(commit_text_registry):
+def test_render_list(commit_text_registry):
     reg = commit_text_registry
 
     commits = [
@@ -78,7 +78,7 @@ def test_make_list(commit_text_registry):
         ],
     }
 
-    markup = _make_list(scope_dict)
+    markup = _render_list(scope_dict)
 
     assert markup == (
         f'* {commits[0].subject}\n'
@@ -93,15 +93,101 @@ def test_make_list(commit_text_registry):
     )
 
 
-class Test_make_release_markup:
+@parametrize(
+    'first, second, third, expected',
+    [
+        (None, None, None, False),
+        (None, None, '-----\n', False),
+        (None, 'title\n', '-----\n', False),
+        ('title\n', '-----\n', '\n', True),
+        ('title\n', '-----\n', None, True),
+        ('\n', 'title\n', '-----\n', True),
+        ('-----\n', 'title\n', '-----\n', True),
+        ('---------\n', '  title  \n', '---------\n', True),
+        ('title\n', '-----\n', 'Paragraphs.', True),
+        ('Paragrah.', 'title\n', '-----\n', False),
+        ('-----\n', 'title\n', 'Paragraphs.', False),
+    ]
+)
+def test_is_title(first, second, third, expected):
+    assert is_title(first, second, third) is expected
+
+
+rst_file1 = '''
+.. currentmodule:: mymodule
+
+Title
+=====
+
+-------------
+Section title
+-------------
+
+Some Other Content
+
+'''
+
+rst_file2 = '''
+Title
+=====
+
+This is a paragraph.
+
+Another paragraph.
+
+Section title
+-------------
+
+Some Other Content
+
+'''
+
+rst_file3 = '''Section title
+~~~~~~~~~~~~~
+
+'''
+
+rst_file4 = 'Paragrah 1.\nParagrah 2.\nParagrah 3.'
+
+rst_file5 = ''
+
+
+@parametrize(
+    'file_content, endswith, startswith',
+    [
+        (rst_file1, '=====\n\n', '-------------'),
+        (rst_file2, 'Another paragraph.\n\n', 'Section title'),
+        (rst_file3, '', 'Section title'),
+        (rst_file4, 'Paragrah 3.', ''),
+        (rst_file5, '', ''),
+    ],
+    ids=[
+        'Main title without paragraph',
+        'Main title with paragraph',
+        'Empty content',
+        'Without title',
+        'empty file',
+    ]
+)
+def test_split_chglog(
+        isolated_filesystem, file_content, endswith, startswith):
+
+    with isolated_filesystem:
+        path = Path('document.rst')
+        path.write_text(file_content)
+
+        top, bottom = _split_chglog(path, 'Section title')
+
+        assert top.endswith(endswith)
+        assert bottom.startswith(startswith)
+
+
+class Test_render_release:
 
     def test_release_with_fixes_and_features(self, commit_list):
         version = Version(major=10, minor=3, patch=0)
         commits = _organize_commits(commit_list)
-        markup = _make_release_markup(
-            version,
-            grouped_commits=commits['by_action'],
-        )
+        markup = _render_release(version, grouped_commits=commits['by_action'])
 
         assert markup == (
             f'10.3.0 ({str(date.today())})\n'
@@ -124,7 +210,7 @@ class Test_make_release_markup:
         commits = _organize_commits(commit_list)
         version = Version(major=10, minor=3, patch=0)
 
-        markup = _make_release_markup(
+        markup = _render_release(
             version,
             grouped_commits=commits['by_action'],
         )
@@ -142,7 +228,7 @@ class Test_make_release_markup:
         version = Version(major=10, minor=3, patch=0)
         commit_list = [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']]
         commits = _organize_commits(commit_list)
-        markup = _make_release_markup(
+        markup = _render_release(
             version,
             grouped_commits=commits['by_action'],
         )
@@ -158,42 +244,71 @@ class Test_make_release_markup:
         )
 
 
-class TestUpdateChangelog:
+@parametrize(
+    'file_content, expected',
+    [
+        ('', 'New Content\n'),
+        (
+            (
+                'Changelog\n'
+                '=========\n'
+                '\n'
+                '1.0.0\n'
+                '~~~~~\n'
+                'Content\n'
+            ),
+            (
+                'Changelog\n'
+                '=========\n'
+                '\n'
+                'New Content\n'
+                '1.0.0\n'
+                '~~~~~\n'
+                'Content\n'
+            ),
+        ),
+        (
+            (
+                'One Paragraph.\n'
+                'Two Paragraphs.\n'
+                '\n'
+                'Another Paragraph\n'
+            ),
+            (
+                'One Paragraph.\n'
+                'Two Paragraphs.\n'
+                '\n'
+                'Another Paragraph\n'
+                'New Content\n'
+            ),
+        ),
+    ],
+    ids=[
+        'Empty file',
+        'File with a release section',
+        'File without release section',
+    ],
+)
+@patch('braulio.files._render_release', return_value='New Content\n')
+def test_update_chglog(
+        mock_render_release, isolated_filesystem, file_content, expected):
+    cur_version = Version('1.0.0')
+    new_version = Version('2.0.0')
 
-    @patch('braulio.files._make_release_markup')
-    def test_write_to_changelog_file(
-        self, mock_make_release_markup, isolated_filesystem
-    ):
-        mock_make_release_markup.return_value = 'New Content'
+    with isolated_filesystem:
+        path = Path.cwd() / 'CHANGELOG.rst'
+        path.write_text(file_content)
 
-        with isolated_filesystem:
-            with open('CHANGELOG.rst', 'w') as f:
-                f.write(
-                    f'{_make_title("History")}'
-                    'Content'
-                )
+        update_chglog(path, cur_version, new_version, {})
 
-            version = Version()
-            organized_commits = {}
-            path = Path.cwd() / 'CHANGELOG.rst'
+        mock_render_release.assert_called_with(new_version, {})
 
-            update_changelog(path, version, organized_commits)
+        text = path.read_text()
 
-            text = Path('CHANGELOG.rst').read_text()
-
-            assert text == (
-                'History\n'
-                '=======\n\n'
-                'New Content'
-                'Content'
-            )
-
-            mock_make_release_markup.assert_called_with(
-                version, organized_commits
-            )
+        assert text == expected
 
 
-class TestUpdateFiles:
+class Test_update_files:
 
     def test_files_missing_version_string(self, fake_repository):
         paths = ['setup.py', 'black/__init__.py']

@@ -8,7 +8,7 @@ KNOWN_CHANGELOG_FILES = ('HISTORY.rst', 'CHANGELOG.rst', 'CHANGES.rst')
 DEFAULT_CHANGELOG = KNOWN_CHANGELOG_FILES[0]
 
 
-def find_changelog_file():
+def find_chglog_file():
     for file_name in KNOWN_CHANGELOG_FILES:
         path = Path.cwd() / file_name
 
@@ -17,23 +17,23 @@ def find_changelog_file():
     return None
 
 
-def create_changelog_file(name=None):
+def create_chglog_file(name=None):
     file_name = name or DEFAULT_CHANGELOG
     path = (Path.cwd() / file_name)
     path.touch()
-    path.write_text(_make_title('History'))
+    path.write_text(_render_title('History'))
 
     mark = click.style('✓', fg='green')
     click.echo(f' {mark} {file_name} created succesfully.')
 
 
-def _make_title(title, level=1):
+def _render_title(title, level=1):
     underlines = ['=', '-', '~']
     underline = underlines[level - 1] * len(title)
     return f'{title}\n{underline}\n\n'
 
 
-def _make_sublist(commits):
+def _render_subtitle(commits):
     markup = ''
 
     for commit in commits:
@@ -42,7 +42,7 @@ def _make_sublist(commits):
     return markup
 
 
-def _make_list(scope_dict):
+def _render_list(scope_dict):
     markup = ''
 
     for commit in scope_dict['scopeless']:
@@ -54,39 +54,86 @@ def _make_list(scope_dict):
         markup += f'* {scope_name}'
 
         if len(commit_lst) > 1:
-            markup += '\n\n' + _make_sublist(commit_lst)
+            markup += '\n\n' + _render_subtitle(commit_lst)
         else:
             markup += f' - {commit_lst[0].subject}\n'
 
     return markup + '\n'
 
 
-def _make_release_markup(version, grouped_commits):
+def _render_release(version, grouped_commits):
     today = str(date.today())
     title = f'{version.string} ({today})'
-    markup = _make_title(title, level=2)
+    markup = _render_title(title, level=2)
 
     if 'fix' in grouped_commits:
-        markup += _make_title('Bug Fixes', level=3)
-        markup += _make_list(grouped_commits['fix'])
+        markup += _render_title('Bug Fixes', level=3)
+        markup += _render_list(grouped_commits['fix'])
 
     if 'feat' in grouped_commits:
-        markup += _make_title('Features', level=3)
-        markup += _make_list(grouped_commits['feat'])
+        markup += _render_title('Features', level=3)
+        markup += _render_list(grouped_commits['feat'])
 
     return markup
 
 
-def update_changelog(path, version, grouped_commits):
-    markup = _make_release_markup(version, grouped_commits)
-    lines = []
+title_adornment_pattern = re.compile("^(?:=|~|-|\*|`|')+$")
+
+
+def is_title(first, second, third):
+
+    if not first or not second:
+        return False
+
+    if (title_adornment_pattern.match(first) and
+       len(first) == len(second) and
+       first == third):
+        return True
+
+    if first == '\n' and third:
+        first, second = second, third
+
+    if len(first) == len(second) and title_adornment_pattern.match(second):
+        return True
+
+    return False
+
+
+def _split_chglog(path, title):
+    """Split a RST file text in two parts. The title argument determine the
+    split point. The given title goes in the bottom part. If the title is not
+    found everything goes in the top part.
+
+    Return a tuple with the top and bottom parts.
+    """
 
     with path.open() as f:
-        for line in f:
-            lines.append(line)
+        doc = f.readlines()
 
-    top = ''.join(lines[:3])
-    bottom = ''.join(lines[3:])
+    has_title = False
+
+    for idx, curr_line in enumerate(doc):
+
+        if title in curr_line:
+            prev_line = doc[idx - 1] if idx - 1 < len(doc) else '\n'
+            next_line = doc[idx + 1] if idx + 1 < len(doc) else None
+
+            if is_title(prev_line, curr_line, next_line):
+                idx = idx if prev_line == '\n' else idx - 1
+                has_title = True
+                break
+
+    if has_title:
+        top, bottom = doc[:idx], doc[idx:]
+    else:
+        top, bottom = doc, []
+
+    return ''.join(top), ''.join(bottom)
+
+
+def update_chglog(path, current_version, new_version, grouped_commits):
+    top, bottom = _split_chglog(path, title=current_version.string)
+    markup = _render_release(new_version, grouped_commits)
 
     path.write_text(top + markup + bottom)
 

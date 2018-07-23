@@ -1,6 +1,6 @@
 import click
 from braulio.git import Git
-from braulio.files import update_changelog, update_files
+from braulio.files import update_chglog, update_files
 from braulio.version import Version, get_next_version
 
 
@@ -68,9 +68,10 @@ def release(
     if confirm_flag or click.confirm('Continue?'):
 
         try:
-            update_changelog(
+            update_chglog(
                 changelog_file,
-                version=new_version,
+                new_version=new_version,
+                current_version=current_version,
                 grouped_commits=commits['by_action'],
             )
         except FileNotFoundError:

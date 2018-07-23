@@ -4,7 +4,7 @@ from click import style
 from braulio.version import validate_version_str
 from braulio.release import release as _release
 from braulio.config import Config, update_config_file
-from braulio.files import find_changelog_file, create_changelog_file, \
+from braulio.files import find_chglog_file, create_chglog_file, \
     DEFAULT_CHANGELOG
 
 
@@ -29,7 +29,7 @@ def cli(ctx):
               help='A name for the changelog file to be created')
 def init(changelog_name):
 
-    changelog_path = find_changelog_file()
+    changelog_path = find_chglog_file()
     create_changelog_flag = True
     mark = style('?', fg='blue', bold=True)
 
@@ -50,7 +50,7 @@ def init(changelog_name):
             changelog_name = click.prompt(message, default=DEFAULT_CHANGELOG)
 
     if create_changelog_flag:
-        create_changelog_file(changelog_name)
+        create_chglog_file(changelog_name)
 
     if changelog_name and create_changelog_flag:
         update_config_file('changelog_file', changelog_name)

@@ -57,7 +57,7 @@ class TestInit:
             assert config.get('braulio', 'changelog_file') == 'CUSTOM.rst'
 
     @pytest.mark.parametrize('_input', ['y', 'n'])
-    @patch('braulio.cli.create_changelog_file', autospec=True)
+    @patch('braulio.cli.create_chglog_file', autospec=True)
     def test_known_changelog_found(
             self, mock_create_changelog_file, known_changelog_file, _input):
 
@@ -114,9 +114,9 @@ class TestRelease:
         mock_git.tag.assert_not_called()
 
     @parametrize('_input', ['y', 'n'])
-    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.update_chglog')
     @patch('braulio.release.Git', autospec=True)
-    def test_confirmation_prompt(self, MockGit, mock_update_changelog, _input):
+    def test_confirmation_prompt(self, MockGit, mock_update_chglog, _input):
         runner = CliRunner()
 
         result = runner.invoke(cli, ['release'], input=_input)
@@ -127,7 +127,7 @@ class TestRelease:
 
         called = True if _input == 'y' else False
 
-        assert mock_update_changelog.called is called
+        assert mock_update_chglog.called is called
         assert mock_git.commit.called is called
         assert mock_git.tag.called is called
 
@@ -144,24 +144,27 @@ class TestRelease:
             ('--bump=3.0.0', [], '3.0.0',),
         ],
     )
-    @patch('braulio.release.update_changelog', autospec=True)
+    @patch('braulio.release.update_chglog', autospec=True)
     @patch('braulio.release.Git', autospec=True)
     def test_manual_version_bump(
-            self, MockGit, mock_update_changelog, option, tags, expected):
+            self, MockGit, mock_update_chglog, option, tags, expected):
 
         mock_git = MockGit()
         mock_git.tags = tags
+        current_version = Version() if not tags else tags[0].version
 
         runner = CliRunner()
         result = runner.invoke(cli, ['release', option], input='y')
 
         assert result.exit_code == 0
 
-        mock_update_changelog.assert_called()
-
-        # Check what version was passed to update_changelog function
-        passed_args = mock_update_changelog.call_args[1]
-        assert passed_args['version'] == Version(expected)
+        # Check what version was passed to update_chglog function
+        mock_update_chglog.assert_called_with(
+            Path('HISTORY.rst'),
+            current_version=current_version,
+            new_version=Version(expected),
+            grouped_commits={},
+        )
 
         mock_git.commit.assert_called_with(
             f'Release version {expected}',
@@ -180,7 +183,7 @@ class TestRelease:
             (['8c8dcb7', 'ccaa185'], None, '1.0.0'),
         ],
     )
-    @patch('braulio.release.update_changelog', autospec=True)
+    @patch('braulio.release.update_chglog', autospec=True)
     @patch('braulio.release.Git', autospec=True)
     def test_determine_next_version_from_commit_messages(
         self,
@@ -205,9 +208,9 @@ class TestRelease:
 
         mocked_update_changelog.assert_called()
 
-        # Check what version was passed to update_changelog function
+        # Check what version was passed to update_chglog function
         passed_args = mocked_update_changelog.call_args[1]
-        assert passed_args['version'] == Version(expected)
+        assert passed_args['new_version'] == Version(expected)
 
         mock_git.commit.assert_called_with(
             f'Release version {expected}',
@@ -216,14 +219,14 @@ class TestRelease:
         mock_git.tag.assert_called_with(f'v{expected}')
 
     @patch('braulio.release._organize_commits')
-    @patch('braulio.release.update_changelog')
+    @patch('braulio.release.update_chglog')
     @patch('braulio.release.get_next_version')
     @patch('braulio.release.Git', autospec=True)
     def test_call_to_update_changelog(
         self,
         MockGit,
         mock_get_next_version,
-        mock_update_changelog,
+        mock_update_chglog,
         mock_organize_commits,
     ):
         runner = CliRunner()
@@ -243,9 +246,10 @@ class TestRelease:
             mock_git.tags[0].version
         )
 
-        mock_update_changelog.assert_called_with(
+        mock_update_chglog.assert_called_with(
             Path('HISTORY.rst'),
-            version=mock_get_next_version(),
+            current_version=mock_git.tags[0].version,
+            new_version=mock_get_next_version(),
             grouped_commits=mock_organize_commits()['by_action']
         )
 
