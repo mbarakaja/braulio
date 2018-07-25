@@ -119,18 +119,19 @@ class TestRelease:
     def test_confirmation_prompt(self, MockGit, mock_update_chglog, _input):
         runner = CliRunner()
 
-        result = runner.invoke(cli, ['release'], input=_input)
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, ['release'], input=_input)
 
-        exit_code = 0 if _input == 'y' else 1
-        assert result.exit_code == exit_code, result.exception
-        assert ' › Continue? [y/N]' in result.output
+            exit_code = 0 if _input == 'y' else 1
+            assert result.exit_code == exit_code, result.output
+            assert ' › Continue? [y/N]' in result.output
 
-        mock_git = MockGit()
+            mock_git = MockGit()
 
-        called = True if _input == 'y' else False
-        assert mock_update_chglog.called is called
-        assert mock_git.commit.called is called
-        assert mock_git.tag.called is called
+            called = True if _input == 'y' else False
+            assert mock_update_chglog.called is called
+            assert mock_git.commit.called is called
+            assert mock_git.tag.called is called
 
     @parametrize(
         'option, tags, expected',
@@ -153,25 +154,26 @@ class TestRelease:
         mock_git = MockGit()
         mock_git.tags = tags
         current_version = Version() if not tags else tags[0].version
-
         runner = CliRunner()
-        result = runner.invoke(cli, ['release', option], input='y')
 
-        assert result.exit_code == 0
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, ['release', option], input='y')
 
-        # Check what version was passed to update_chglog function
-        mock_update_chglog.assert_called_with(
-            Path('HISTORY.rst'),
-            current_version=current_version,
-            new_version=Version(expected),
-            release_data={},
-        )
+            assert result.exit_code == 0
 
-        mock_git.commit.assert_called_with(
-            f'Release version {expected}',
-            files=['HISTORY.rst'],
-        )
-        mock_git.tag.assert_called_with(f'v{expected}')
+            # Check what version was passed to update_chglog function
+            mock_update_chglog.assert_called_with(
+                Path('HISTORY.rst'),
+                current_version=current_version,
+                new_version=Version(expected),
+                release_data={},
+            )
+
+            mock_git.commit.assert_called_with(
+                f'Release version {expected}',
+                files=['HISTORY.rst'],
+            )
+            mock_git.tag.assert_called_with(f'v{expected}')
 
     @parametrize(
         'hash_lst, tags, expected',
@@ -203,21 +205,22 @@ class TestRelease:
 
         runner = CliRunner()
 
-        result = runner.invoke(cli, ['release', '-y'])
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, ['release', '-y'])
 
-        assert result.exit_code == 0, result.exception
+            assert result.exit_code == 0, result.exception
 
-        mocked_update_changelog.assert_called()
+            mocked_update_changelog.assert_called()
 
-        # Check what version was passed to update_chglog function
-        passed_args = mocked_update_changelog.call_args[1]
-        assert passed_args['new_version'] == Version(expected)
+            # Check what version was passed to update_chglog function
+            passed_args = mocked_update_changelog.call_args[1]
+            assert passed_args['new_version'] == Version(expected)
 
-        mock_git.commit.assert_called_with(
-            f'Release version {expected}',
-            files=['HISTORY.rst'],
-        )
-        mock_git.tag.assert_called_with(f'v{expected}')
+            mock_git.commit.assert_called_with(
+                f'Release version {expected}',
+                files=['HISTORY.rst'],
+            )
+            mock_git.tag.assert_called_with(f'v{expected}')
 
     @patch('braulio.cli.ReleaseDataTree')
     @patch('braulio.cli.update_chglog', autospec=True)
@@ -231,30 +234,32 @@ class TestRelease:
         MockReleaseDataTree,
     ):
         runner = CliRunner()
-        result = runner.invoke(cli, ['release', '-y'])
 
-        assert result.exit_code == 0
+        with runner.isolated_filesystem():
+            result = runner.invoke(cli, ['release', '-y'])
 
-        mock_git = MockGit()
-        mock_git.log.assert_called()
+            assert result.exit_code == 0
 
-        MockReleaseDataTree.assert_called_with(
-            mock_git.log()
-        )
+            mock_git = MockGit()
+            mock_git.log.assert_called()
 
-        release_data = MockReleaseDataTree()
+            MockReleaseDataTree.assert_called_with(
+                mock_git.log()
+            )
 
-        mock_get_next_version.assert_called_with(
-            release_data.bump_version_to,
-            mock_git.tags[0].version
-        )
+            release_data = MockReleaseDataTree()
 
-        mock_update_chglog.assert_called_with(
-            Path('HISTORY.rst'),
-            current_version=mock_git.tags[0].version,
-            new_version=mock_get_next_version(),
-            release_data=release_data
-        )
+            mock_get_next_version.assert_called_with(
+                release_data.bump_version_to,
+                mock_git.tags[0].version
+            )
+
+            mock_update_chglog.assert_called_with(
+                Path('HISTORY.rst'),
+                current_version=mock_git.tags[0].version,
+                new_version=mock_get_next_version(),
+                release_data=release_data
+            )
 
     @patch('braulio.cli.Git', autospec=True)
     def test_changelog_not_found(self, MockGit):
