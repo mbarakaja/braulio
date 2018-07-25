@@ -88,7 +88,7 @@ class TestRelease:
             ([Tag('v0.3.3'), Tag('v0.3.2')], 'v0.3.3'),
         ]
     )
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
     def test_call_to_git_log_method(self, MockGit, tag_list, from_arg):
         mock_git = MockGit()
         mock_git.tags = tag_list
@@ -100,7 +100,7 @@ class TestRelease:
         assert 'Nothing to release' in result.output
         mock_git.log.assert_called_with(_from=from_arg)
 
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
     def test_no_commits(self, MockGit):
         mock_git = MockGit()
         mock_git.log.return_value = []
@@ -114,8 +114,8 @@ class TestRelease:
         mock_git.tag.assert_not_called()
 
     @parametrize('_input', ['y', 'n'])
-    @patch('braulio.release.update_chglog')
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.update_chglog')
+    @patch('braulio.cli.Git', autospec=True)
     def test_confirmation_prompt(self, MockGit, mock_update_chglog, _input):
         runner = CliRunner()
 
@@ -144,8 +144,8 @@ class TestRelease:
             ('--bump=3.0.0', [], '3.0.0',),
         ],
     )
-    @patch('braulio.release.update_chglog', autospec=True)
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.update_chglog', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
     def test_manual_version_bump(
             self, MockGit, mock_update_chglog, option, tags, expected):
 
@@ -163,7 +163,7 @@ class TestRelease:
             Path('HISTORY.rst'),
             current_version=current_version,
             new_version=Version(expected),
-            grouped_commits={},
+            release_data={},
         )
 
         mock_git.commit.assert_called_with(
@@ -183,8 +183,8 @@ class TestRelease:
             (['8c8dcb7', 'ccaa185'], None, '1.0.0'),
         ],
     )
-    @patch('braulio.release.update_chglog', autospec=True)
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.update_chglog', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
     def test_determine_next_version_from_commit_messages(
         self,
         MockGit,
@@ -218,16 +218,16 @@ class TestRelease:
         )
         mock_git.tag.assert_called_with(f'v{expected}')
 
-    @patch('braulio.release._organize_commits')
-    @patch('braulio.release.update_chglog')
-    @patch('braulio.release.get_next_version')
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.ReleaseDataTree')
+    @patch('braulio.cli.update_chglog', autospec=True)
+    @patch('braulio.cli.get_next_version')
+    @patch('braulio.cli.Git', autospec=True)
     def test_call_to_update_changelog(
         self,
         MockGit,
         mock_get_next_version,
         mock_update_chglog,
-        mock_organize_commits,
+        MockReleaseDataTree,
     ):
         runner = CliRunner()
         result = runner.invoke(cli, ['release', '-y'])
@@ -237,12 +237,14 @@ class TestRelease:
         mock_git = MockGit()
         mock_git.log.assert_called()
 
-        mock_organize_commits.assert_called_with(
+        MockReleaseDataTree.assert_called_with(
             mock_git.log()
         )
 
+        release_data = MockReleaseDataTree()
+
         mock_get_next_version.assert_called_with(
-            mock_organize_commits()['bump_version_to'],
+            release_data.bump_version_to,
             mock_git.tags[0].version
         )
 
@@ -250,10 +252,10 @@ class TestRelease:
             Path('HISTORY.rst'),
             current_version=mock_git.tags[0].version,
             new_version=mock_get_next_version(),
-            grouped_commits=mock_organize_commits()['by_action']
+            release_data=release_data
         )
 
-    @patch('braulio.release.Git', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
     def test_changelog_not_found(self, MockGit):
         runner = CliRunner()
 
@@ -269,8 +271,8 @@ class TestRelease:
             mock_git.commit.assert_not_called()
             mock_git.tag.assert_not_called()
 
-    @patch('braulio.release.Git', autospec=True)
-    @patch('braulio.release.update_files', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
+    @patch('braulio.cli.update_files', autospec=True)
     def test_files_argument_from_command_line(
         self, mock_update_files, MockGit, fake_repository
     ):
@@ -290,8 +292,8 @@ class TestRelease:
             '0.0.1'
         )
 
-    @patch('braulio.release.Git', autospec=True)
-    @patch('braulio.release.update_files', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
+    @patch('braulio.cli.update_files', autospec=True)
     def test_files_argument_from_config_file(
         self, mock_update_files, MockGit, fake_repository
     ):
@@ -310,8 +312,8 @@ class TestRelease:
             '0.0.1'
         )
 
-    @patch('braulio.release.Git', autospec=True)
-    @patch('braulio.release.update_files', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
+    @patch('braulio.cli.update_files', autospec=True)
     def test_added_files_to_release_commit(
         self, mock_update_files, MockGit, fake_repository
     ):
@@ -339,7 +341,7 @@ class TestRelease:
         (['--commit'], {'commit': False}, True,),
     ],
 )
-@patch('braulio.release.Git', autospec=True)
+@patch('braulio.cli.Git', autospec=True)
 def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
     """Test commit flag picked from CLI or configuration file"""
 
@@ -371,7 +373,7 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
         (['--tag'], {'tag': False}, True,),
     ],
 )
-@patch('braulio.release.Git', autospec=True)
+@patch('braulio.cli.Git', autospec=True)
 def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
     """Test tag flag picked from CLI or configuration file"""
 

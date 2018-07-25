@@ -3,10 +3,9 @@ from unittest.mock import patch
 from datetime import date
 from pathlib import Path
 from braulio.git import Commit, Version
-from braulio.release import _organize_commits
 from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES, \
     _render_title, _render_subtitle, _render_list, _render_release, \
-    update_chglog, update_files, is_title, _split_chglog
+    update_chglog, update_files, is_title, _split_chglog, ReleaseDataTree
 
 
 parametrize = pytest.mark.parametrize
@@ -21,6 +20,36 @@ def test_known_changelog_files():
     assert 'HISTORY.rst' in KNOWN_CHANGELOG_FILES
     assert 'CHANGELOG.rst' in KNOWN_CHANGELOG_FILES
     assert 'CHANGES.rst' in KNOWN_CHANGELOG_FILES
+
+
+class TestReleaseDataTree:
+
+    @pytest.mark.parametrize(
+        'hash_list, expected',
+        [
+            (['eaedb93', '8c8dcb7'], 'major'),
+            (['ccaa185', '264af1b'], 'minor'),
+            (['4d17c1a', '80a9e0e'], 'patch'),
+        ],
+    )
+    def test_bump_version_to(self, commit_registry, hash_list, expected):
+        commit_list = [
+            commit_registry[short_hash] for short_hash in hash_list
+        ]
+
+        release = ReleaseDataTree(commit_list)
+
+        assert release.bump_version_to == expected
+
+    def test_commit_grouping_by_action_and_scope(self, commit_list):
+        release_data = ReleaseDataTree(commit_list)
+
+        assert len(release_data['fix']['thing']) == 1
+        assert len(release_data['feat']['scopeless']) == 1
+        assert len(release_data['feat']['cli']) == 1
+        assert len(release_data['feat']['music']) == 2
+        assert len(release_data['refactor']['music']) == 1
+        assert len(release_data['refactor']['lorem']) == 1
 
 
 @parametrize(
@@ -186,8 +215,8 @@ class Test_render_release:
 
     def test_release_with_fixes_and_features(self, commit_list):
         version = Version(major=10, minor=3, patch=0)
-        commits = _organize_commits(commit_list)
-        markup = _render_release(version, grouped_commits=commits['by_action'])
+        release_data = ReleaseDataTree(commit_list)
+        markup = _render_release(version, release_data=release_data)
 
         assert markup == (
             f'10.3.0 ({str(date.today())})\n'
@@ -207,12 +236,12 @@ class Test_render_release:
     def test_release_with_fixes(self, commit_registry):
         reg = commit_registry
         commit_list = [reg['4d17c1a']]
-        commits = _organize_commits(commit_list)
+        release_data = ReleaseDataTree(commit_list)
         version = Version(major=10, minor=3, patch=0)
 
         markup = _render_release(
             version,
-            grouped_commits=commits['by_action'],
+            release_data=release_data,
         )
 
         assert markup == (
@@ -227,10 +256,10 @@ class Test_render_release:
         reg = commit_registry
         version = Version(major=10, minor=3, patch=0)
         commit_list = [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']]
-        commits = _organize_commits(commit_list)
+        release_data = ReleaseDataTree(commit_list)
         markup = _render_release(
             version,
-            grouped_commits=commits['by_action'],
+            release_data=release_data,
         )
 
         assert markup == (

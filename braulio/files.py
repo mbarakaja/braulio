@@ -1,11 +1,62 @@
 import re
 import click
+from collections import UserDict
 from datetime import date
 from pathlib import Path
 
 
 KNOWN_CHANGELOG_FILES = ('HISTORY.rst', 'CHANGELOG.rst', 'CHANGES.rst')
 DEFAULT_CHANGELOG = KNOWN_CHANGELOG_FILES[0]
+
+
+class ReleaseDataTree(UserDict):
+    """Takes a list of :class:`~braulio.git.Commit` objects, and classify them
+    by type of action (feat, fix, refactor, etc) and then by the scope of the
+    commit.
+
+    This is a dict like class, so, the found actions can be accessed normally
+    by the key name.
+
+    Commits without an specified action are filter out.
+    """
+
+    def __init__(self, commit_list):
+
+        self.data = {}
+
+        # If this release is braking thing
+        is_breaking = False
+
+        for commit in commit_list:
+            if commit.action:
+
+                is_breaking = (
+                    is_breaking or 'BREAKING CHANGE' in commit.message
+                )
+
+                action, scope = commit.action, commit.scope
+
+                if action not in self:
+                    self[action] = {'scopeless': []}
+
+                if not scope:
+                    self[action]['scopeless'].append(commit)
+                    continue
+                else:
+                    if scope not in self[action]:
+                        self[action][commit.scope] = []
+
+                    self[action][scope].append(commit)
+
+        bump_type = 'major' if is_breaking else \
+                    'minor' if 'feat' in self else \
+                    'patch'
+
+        self._bump_version_to = bump_type
+
+    @property
+    def bump_version_to(self):
+        return self._bump_version_to
 
 
 def find_chglog_file():
@@ -61,18 +112,18 @@ def _render_list(scope_dict):
     return markup + '\n'
 
 
-def _render_release(version, grouped_commits):
+def _render_release(version, release_data):
     today = str(date.today())
     title = f'{version.string} ({today})'
     markup = _render_title(title, level=2)
 
-    if 'fix' in grouped_commits:
+    if 'fix' in release_data:
         markup += _render_title('Bug Fixes', level=3)
-        markup += _render_list(grouped_commits['fix'])
+        markup += _render_list(release_data['fix'])
 
-    if 'feat' in grouped_commits:
+    if 'feat' in release_data:
         markup += _render_title('Features', level=3)
-        markup += _render_list(grouped_commits['feat'])
+        markup += _render_list(release_data['feat'])
 
     return markup
 
@@ -131,9 +182,9 @@ def _split_chglog(path, title):
     return ''.join(top), ''.join(bottom)
 
 
-def update_chglog(path, current_version, new_version, grouped_commits):
+def update_chglog(path, current_version, new_version, release_data):
     top, bottom = _split_chglog(path, title=current_version.string)
-    markup = _render_release(new_version, grouped_commits)
+    markup = _render_release(new_version, release_data)
 
     path.write_text(top + markup + bottom)
 
