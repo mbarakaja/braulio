@@ -8,6 +8,22 @@ from braulio.files import find_chglog_file, create_chglog_file, \
     update_chglog, update_files, ReleaseDataTree, DEFAULT_CHANGELOG
 
 
+prefix_mark = style(' › ', fg='blue', bold=True)
+check_mark = click.style('✓', fg='green', bold=True)
+x_mark = click.style('✗', fg='red', bold=True)
+
+
+def msg(message, prefix=prefix_mark, suffix='', silence=False, nl=True):
+
+    if not silence:
+        click.echo(f'{prefix}{message}{suffix}', nl=nl)
+
+
+def label(text):
+    spaces = ' ' * (17 - len(text))
+    return style(f'{text}{spaces}:', fg="blue", bold=True)
+
+
 @click.group()
 @click.pass_context
 def cli(ctx):
@@ -105,13 +121,21 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag,
             confirm_flag, changelog_file, files):
 
     git = Git()
+    current_version = None
+    last_tag_name = None
 
-    last_tag = git.tags[0].name if git.tags else None
-    commit_list = git.log(_from=last_tag)
+    if git.tags:
+        last_tag_name = git.tags[0].name
+        current_version = git.tags[0].version
+
+    commit_list = git.log(_from=last_tag_name)
+
+    msg(f'{label("Current version")} {current_version}')
+    msg(f'{label("Commits found")} {len(commit_list)} since last release')
 
     if not commit_list:
-        click.echo('Nothing to release')
-        return False
+        click.echo(' › Nothing to release.')
+        ctx.exit()
 
     release_data = ReleaseDataTree(commit_list)
 
@@ -123,11 +147,25 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag,
     bump_version_to = bump_version_to or release_data.bump_version_to
 
     # If there is no tag in the repository, assume version 0.0.0
-    current_version = git.tags[0].version if git.tags else Version()
+    current_version = current_version or Version()
 
     new_version = get_next_version(bump_version_to, current_version)
 
-    if confirm_flag or click.confirm('Continue?'):
+    msg(f'{label("New version")} {new_version}')
+    msg(f'{label("Changelog file")} {changelog_file.name}')
+
+    # Messages about what tasks will be performed
+    msg('Braulio will perform the next tasks :')
+    msg(f'        Update {len(files) + 1} files.', prefix='')
+    msg('        Add a release commit.', prefix='', silence=not commit_flag)
+    msg(f'        Tag the repository with v{new_version.string}', prefix='',
+        silence=not tag_flag)
+
+    msg('', prefix='')  # Print just a new line
+
+    if confirm_flag or click.confirm(f'{prefix_mark}Continue?'):
+
+        msg('Update changelog ', nl=False)
 
         try:
             update_chglog(
@@ -137,13 +175,15 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag,
                 release_data=release_data,
             )
         except FileNotFoundError:
-            mark = click.style('✗', fg='red', bold=True)
+            msg(x_mark, prefix='')
             filename = click.style(changelog_file.name, fg='blue', bold=True)
             click.echo(
-                f' {mark} Unable to find {filename}\n'
+                f' {x_mark} Unable to find {filename}\n'
                 '   Run "$ brau init" to create one'
             )
             ctx.abort()
+
+        msg(check_mark, prefix='')
 
         try:
             update_files(files, str(current_version), str(new_version))
@@ -152,11 +192,21 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag,
             ctx.abort()
 
         if commit_flag:
+            commit_message = f'Release version {new_version.string}'
+
+            msg(f'Add commit: {commit_message}', nl=False)
+
             files = [str(changelog_file)] + list(files)
-            git.commit(
-                f'Release version {new_version.string}',
-                files=files,
-            )
+            git.commit(commit_message, files=files)
+            msg(f' {check_mark}', prefix='')
 
         if tag_flag:
-            git.tag('v' + new_version.string)
+            tagname = 'v' + new_version.string
+            msg(f'Add tag {tagname}', nl=False)
+            git.tag(tagname)
+            msg(f' {check_mark}', prefix='')
+
+        msg(f'Version {new_version} released successfully', suffix=' 🎉')
+
+        return
+    ctx.abort()

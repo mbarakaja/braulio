@@ -97,7 +97,7 @@ class TestRelease:
 
         result = runner.invoke(cli, ['release'])
 
-        assert 'Nothing to release' in result.output
+        assert result.exit_code == 0
         mock_git.log.assert_called_with(_from=from_arg)
 
     @patch('braulio.cli.Git', autospec=True)
@@ -108,7 +108,7 @@ class TestRelease:
 
         result = runner.invoke(cli, ['release'])
 
-        assert 'Nothing to release' in result.output
+        assert ' › Nothing to release.' in result.output
 
         mock_git.commit.assert_not_called()
         mock_git.tag.assert_not_called()
@@ -120,13 +120,14 @@ class TestRelease:
         runner = CliRunner()
 
         result = runner.invoke(cli, ['release'], input=_input)
-        assert result.exit_code == 0
-        assert 'Continue? [y/N]' in result.output
+
+        exit_code = 0 if _input == 'y' else 1
+        assert result.exit_code == exit_code, result.exception
+        assert ' › Continue? [y/N]' in result.output
 
         mock_git = MockGit()
 
         called = True if _input == 'y' else False
-
         assert mock_update_chglog.called is called
         assert mock_git.commit.called is called
         assert mock_git.tag.called is called
@@ -330,6 +331,73 @@ class TestRelease:
             'Release version 0.0.1',
             files=['HISTORY.rst', 'white/__init__.py', 'setup.py']
         )
+
+    @parametrize(
+        'options',
+        [
+            ['--no-commit', '--bump=0.2.1'],
+            ['--no-tag'],
+        ],
+    )
+    @patch('braulio.cli.Git', autospec=True)
+    def test_output_after_confirmation_prompt(
+            self, MockGit, isolated_filesystem, commit_list, options):
+
+        runner = CliRunner()
+        mock_git = MockGit()
+        mock_git.tags = [Tag('v0.2.0')]
+        mock_git.log.return_value = commit_list
+
+        with isolated_filesystem:
+            result = runner.invoke(cli, ['release'] + options)
+
+            assert result.exit_code == 1, result.output
+
+            assert ' › Current version  : 0.2.0' in result.output
+            assert f' › Commits found    : {len(commit_list)}' in result.output
+            assert ' › New version      :' in result.output
+            assert ' › Braulio will perform the next tasks :' in result.output
+
+            if '--no-tag' not in options:
+                assert 'Tag the repository with v0.2.1' in result.output
+
+            if '--no-commit' not in options:
+                assert 'Add a release commit' in result.output
+
+            assert ' › Continue?' in result.output
+
+    @parametrize(
+        'options',
+        [
+            ['--no-commit', '--bump=0.2.1'],
+            ['--no-tag', '--bump=0.2.1'],
+        ],
+    )
+    @patch('braulio.cli.Git', autospec=True)
+    def test_output_before_confirmation_prompt(
+            self, MockGit, isolated_filesystem, commit_list, options):
+
+        runner = CliRunner()
+        mock_git = MockGit()
+        mock_git.tags = [Tag('v0.2.0')]
+        mock_git.log.return_value = commit_list
+
+        with isolated_filesystem:
+            Path('HISTORY.rst').touch()
+
+            result = runner.invoke(cli, ['release'] + options, input='y')
+
+            assert result.exit_code == 0, result.output
+            assert 'Update changelog ✓' in result.output
+
+            if '--no-tag' not in options:
+                assert ' › Add tag v0.2.1 ✓' in result.output
+
+            if '--no-commit' not in options:
+                assert ' › Add commit: Release version 0.2.1 ✓' \
+                        in result.output
+
+            assert 'Version 0.2.1 released successfully 🎉' in result.output
 
 
 @parametrize(
