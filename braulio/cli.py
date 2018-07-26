@@ -44,6 +44,7 @@ def cli(ctx):
 @click.option('--changelog-file', 'changelog_name',
               help='A name for the changelog file to be created')
 def init(changelog_name):
+    """Setup your project."""
 
     changelog_path = find_chglog_file()
     create_changelog_flag = True
@@ -100,25 +101,34 @@ def changelog_file_callback(ctx, param, value):
 
 @cli.command()
 @click.option('--major', 'bump_type', flag_value='major',
-              help='Major version bump')
+              help='Major version bump.')
 @click.option('--minor', 'bump_type', flag_value='minor',
-              help='Minor version bump')
+              help='Minor version bump.')
 @click.option('--patch', 'bump_type', flag_value='patch',
-              help='Patch version bump')
-@click.option('--bump', callback=bump_callback,
-              is_eager=True)
-@click.option('--commit/--no-commit', 'commit_flag', default=True)
-@click.option('--tag/--no-tag', 'tag_flag', default=True)
+              help='Patch version bump.')
+@click.option('--bump', callback=bump_callback, is_eager=True,
+              help='Bump to a given version arbitrarily.')
+@click.option('--commit/--no-commit', 'commit_flag', default=True,
+              help='Enable/disable release commit')
+@click.option('--tag/--no-tag', 'tag_flag', default=True,
+              help='Enable/disable version tagging.')
 @click.option('--changelog-file', 'changelog_file',
               type=click.Path(exists=True),
               callback=changelog_file_callback,
-              help='Specify where to digest the changelog content')
-@click.option('-y', 'confirm_flag', is_flag=True, default=False)
+              help='Specify the changelog file.')
+@click.option('-y', 'confirm_flag', is_flag=True, default=False,
+              help="Don't ask for confirmation")
 @click.argument('files', nargs=-1, type=click.Path(exists=True),
                 callback=files_callback)
 @click.pass_context
 def release(ctx, bump, bump_type, commit_flag, tag_flag,
             confirm_flag, changelog_file, files):
+
+    """Release a new version.
+
+    Determines the next version by inspecting commit messages, updates the
+    changelog, commit the changes and tag the repository with the new version.
+    """
 
     git = Git()
     current_version = None
