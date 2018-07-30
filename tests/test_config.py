@@ -20,6 +20,8 @@ class TestConfig:
         assert config.confirm is False
         assert config.files == ()
         assert config.changelog_file == Path('HISTORY.rst')
+        assert config.label_position == 'footer'
+        assert config.label_pattern == '!{action}:{scope}'
 
     def test_config_file_with_not_braulio_section(self, isolated_filesystem):
         config_file_content = (

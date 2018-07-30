@@ -1,10 +1,10 @@
 import re
 from pathlib import Path
+from typing import NamedTuple
 from subprocess import run, PIPE, CalledProcessError
 from braulio.version import Version
 
 hash_pattern = re.compile('(?<=commit )\w{40}$', re.M)
-task_pattern = re.compile('!\w+:\w*')
 
 
 def _run_command(command):
@@ -40,38 +40,25 @@ class Tag:
 class Commit:
 
     def __init__(self, text):
-        # Remove EOL characters from the end of the text
-        self.text = text[:-2] if text[-2:] == '\n\n' else text[:-1]
-
-        text_lines = self.text.split('\n')
+        self.text = text
+        lines = text.strip().split('\n')
 
         # Commit hash
-        self.hash = text_lines[0][7:]
+        self.hash = lines[0][7:]
 
         # Commit message
-        msg_lines = [line[4:] for line in text_lines[4:]]
+        msg_lines = [line[4:] for line in lines[4:]]
         self.message = '\n'.join(msg_lines)
 
         # Commit message header
         self.header = msg_lines[0]
-        self.subject = self.header
+        self.footer = msg_lines[-1]
 
         # Commit message body
         self.body = None
-        self.scope = None
-        self.action = None
 
         if len(msg_lines) > 2 and msg_lines[1] == '':
             self.body = '\n'.join(msg_lines[2:])
-
-            match = re.search(task_pattern, msg_lines[-1])
-
-            if match:
-                task = match.group(0)
-                action, scope = task.split(':')
-                scope = None if scope == '' else scope
-
-                self.action, self.scope = action[1:], scope
 
     def __repr__(self):
         return f'Commit(\'{self.header}\')'
@@ -152,3 +139,88 @@ class Git:
         if not hasattr(self, '_tag_list'):
             self._tag_list = self.tag()
         return self._tag_list
+
+
+class SemanticCommit(NamedTuple):
+    subject: str
+    message: str
+    action: str
+    scope: str
+
+
+def commit_analyzer(commits, label_pattern, label_position='footer'):
+    """Analyzes a list of :class:`~braulio.git.Commit` objects searching for
+    messages that match a given message convention and extract metadata from
+    them.
+
+    A message convention is determined by ``label_pattern``, which is not a
+    regular expression pattern. Instead it must be a string literals with
+    placeholders that indicates metadata information in a given position of
+    the commit message. The possible placeholders are ``{action}``, ``{scope}``
+    and ``{subject}``.
+
+    The ``label_position`` argument dictates where (header|footer) to look in
+    the commit message for the pattern passed in ```label_pattern``.
+
+    ``{subject}`` must be included in ``label_pattern`` just if the metadata is
+    in the header, otherwise must be omitted.
+
+    Examples.
+
+    If ``label_position`` is equal to **header**, in order to match the next
+    commit message::
+
+        fix(cli): Ensure --help option doesn't hang
+
+    The pattern must be ``{action}({scope}): {subject}``, where the metadata
+    information extracted will be::
+
+        {
+            'action': 'fix',
+            'scope': 'cli',
+            'subject': 'Ensure --help option doesn't hang'
+        }
+    """
+
+    # Internally, a real regular expression pattern is used
+    pattern_string = re.escape(label_pattern)
+
+    # Capturing group patterns
+    action_cgp = r'(?P<action>\w+)'
+    scope_cgp = r'(?P<scope>\w*)'
+    subject_cgp = r'(?P<subject>.+)'
+
+    pattern_string = pattern_string \
+        .replace(r'\{action\}', action_cgp) \
+        .replace(r'\{scope\}', scope_cgp) \
+
+    if label_position == 'header':
+        pattern_string = pattern_string \
+            .replace(r'\{subject\}', subject_cgp)
+
+    regexp_pattern = re.compile(pattern_string)
+
+    semantic_commits = []
+
+    for commit in commits:
+        text = commit.header if label_position == 'header' else commit.footer
+        match = regexp_pattern.search(text)
+
+        if not match:
+            continue
+
+        metadata = match.groupdict()
+
+        if label_position == 'footer':
+            metadata['subject'] = commit.header
+
+        sc = SemanticCommit(
+            subject=metadata['subject'].strip(),
+            action=metadata['action'],
+            scope=metadata.get('scope') or None,
+            message=commit.message,
+        )
+
+        semantic_commits.append(sc)
+
+    return semantic_commits

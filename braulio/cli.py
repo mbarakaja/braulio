@@ -1,7 +1,7 @@
 import click
 from pathlib import Path
 from click import style
-from braulio.git import Git
+from braulio.git import Git, commit_analyzer
 from braulio.version import Version, validate_version_str, get_next_version
 from braulio.config import Config, update_config_file
 from braulio.files import find_chglog_file, create_chglog_file, \
@@ -36,6 +36,8 @@ def cli(ctx):
             'tag_flag': config.tag,
             'commit_flag': config.commit,
             'confirm_flag': config.confirm,
+            'label_position': config.label_position,
+            'label_pattern': config.label_pattern,
         }
     }
 
@@ -116,19 +118,35 @@ def changelog_file_callback(ctx, param, value):
               type=click.Path(exists=True),
               callback=changelog_file_callback,
               help='Specify the changelog file.')
+@click.option('--label-position', type=click.Choice(['header', 'footer']),
+              help='Where the label is located in the commit message.')
+@click.option('--label-pattern',
+              help='Pattern to identify labels in commit messages.')
 @click.option('-y', 'confirm_flag', is_flag=True, default=False,
               help="Don't ask for confirmation")
 @click.argument('files', nargs=-1, type=click.Path(exists=True),
                 callback=files_callback)
 @click.pass_context
-def release(ctx, bump, bump_type, commit_flag, tag_flag,
-            confirm_flag, changelog_file, files):
+def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
+            changelog_file, files, label_pattern, label_position):
 
     """Release a new version.
 
     Determines the next version by inspecting commit messages, updates the
     changelog, commit the changes and tag the repository with the new version.
     """
+
+    # Validate --label-pattern
+    #
+    # The reason for validating this here and not in a callback is because
+    # Click doesn't provide --label-position in ctx.params when --label-pattern
+    # is used alone in the CLI tool.
+    if '{action}' not in label_pattern:
+            raise click.BadParameter('{action} placeholder are required')
+
+    if label_position == 'header' and '{subject}' not in label_pattern:
+        raise click.BadParameter('The label is in the header,'
+                                 ' so {subject} placeholder are required')
 
     git = Git()
     current_version = None
@@ -147,7 +165,10 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag,
         click.echo(' › Nothing to release.')
         ctx.exit()
 
-    release_data = ReleaseDataTree(commit_list)
+    semantic_commits = commit_analyzer(commit_list, label_pattern,
+                                       label_position)
+
+    release_data = ReleaseDataTree(semantic_commits)
 
     # --bump must have precedence over any of --major, --minor or --patch
     bump_version_to = bump or bump_type

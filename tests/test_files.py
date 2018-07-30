@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import patch
+from collections import namedtuple
 from datetime import date
 from pathlib import Path
-from braulio.git import Commit, Version
+from braulio.git import Version, commit_analyzer
 from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES, \
     _render_title, _render_subtitle, _render_list, _render_release, \
     update_chglog, update_files, is_title, _split_chglog, ReleaseDataTree
@@ -24,25 +25,43 @@ def test_known_changelog_files():
 
 class TestReleaseDataTree:
 
+    FakeSemanticCommit = namedtuple(
+        'FakeSemanticCommit', ['action', 'scope', 'message']
+    )
+
     @pytest.mark.parametrize(
-        'hash_list, expected',
+        'semantic_commits, expected',
         [
-            (['eaedb93', '8c8dcb7'], 'major'),
-            (['ccaa185', '264af1b'], 'minor'),
-            (['4d17c1a', '80a9e0e'], 'patch'),
+            (
+                [FakeSemanticCommit(action='fix', scope=None, message=''),
+                 FakeSemanticCommit(action='refactor', scope=None,
+                                    message='BREAKING CHANGES')],
+                'major'
+            ),
+            (
+                [FakeSemanticCommit(action='fix', scope=None, message=''),
+                 FakeSemanticCommit(action='feat', scope=None, message='')],
+                'minor'
+            ),
+            (
+                [FakeSemanticCommit(action='fix', scope=None, message=''),
+                 FakeSemanticCommit(action='refactor', scope=None,
+                                    message='')],
+                'patch'
+            ),
         ],
     )
-    def test_bump_version_to(self, commit_registry, hash_list, expected):
-        commit_list = [
-            commit_registry[short_hash] for short_hash in hash_list
-        ]
+    def test_bump_version_to(self, semantic_commits, expected):
 
-        release = ReleaseDataTree(commit_list)
+        release = ReleaseDataTree(semantic_commits)
 
         assert release.bump_version_to == expected
 
     def test_commit_grouping_by_action_and_scope(self, commit_list):
-        release_data = ReleaseDataTree(commit_list)
+        semantic_commits = commit_analyzer(
+            commit_list, label_pattern='!{action}:{scope}',
+        )
+        release_data = ReleaseDataTree(semantic_commits)
 
         assert len(release_data['fix']['thing']) == 1
         assert len(release_data['feat']['scopeless']) == 1
@@ -65,33 +84,36 @@ def test_render_title(level, expected):
     assert output == expected
 
 
-def test_render_sublist(commit_text_registry):
-    reg = commit_text_registry
-    commits = [
-        Commit(reg['80a9e0e']),
-        Commit(reg['0a10908']),
-        Commit(reg['eaedb93']),
+def test_render_sublist(commit_registry):
+
+    FakeSemanticCommit = namedtuple('FakeSemanticCommit', ['subject'])
+
+    semantic_commits = [
+        FakeSemanticCommit(subject='subject 1'),
+        FakeSemanticCommit(subject='subject 2'),
+        FakeSemanticCommit(subject='subject 3'),
     ]
 
-    markup = _render_subtitle(commits)
+    markup = _render_subtitle(semantic_commits)
 
     assert markup == (
-        f'  - {commits[0].subject}\n'
-        f'  - {commits[1].subject}\n'
-        f'  - {commits[2].subject}\n'
+        f'  - {semantic_commits[0].subject}\n'
+        f'  - {semantic_commits[1].subject}\n'
+        f'  - {semantic_commits[2].subject}\n'
     )
 
 
 def test_render_list(commit_text_registry):
-    reg = commit_text_registry
+
+    FakeSemanticCommit = namedtuple('FakeSemanticCommit', ['subject'])
 
     commits = [
-        Commit(reg['80a9e0e']),
-        Commit(reg['0a10908']),
-        Commit(reg['eaedb93']),
+        FakeSemanticCommit(subject='subject 1'),
+        FakeSemanticCommit(subject='subject 2'),
+        FakeSemanticCommit(subject='subject 3'),
     ]
 
-    scope_dict = {
+    release_data_tree = {
         'scopeless': [
             commits[0],
             commits[1],
@@ -107,7 +129,7 @@ def test_render_list(commit_text_registry):
         ],
     }
 
-    markup = _render_list(scope_dict)
+    markup = _render_list(release_data_tree)
 
     assert markup == (
         f'* {commits[0].subject}\n'
@@ -215,7 +237,11 @@ class Test_render_release:
 
     def test_release_with_fixes_and_features(self, commit_list):
         version = Version(major=10, minor=3, patch=0)
-        release_data = ReleaseDataTree(commit_list)
+        semantic_commits = commit_analyzer(
+            commit_list,
+            label_pattern='!{action}:{scope}',
+        )
+        release_data = ReleaseDataTree(semantic_commits)
         markup = _render_release(version, release_data=release_data)
 
         assert markup == (
@@ -234,9 +260,11 @@ class Test_render_release:
         )
 
     def test_release_with_fixes(self, commit_registry):
-        reg = commit_registry
-        commit_list = [reg['4d17c1a']]
-        release_data = ReleaseDataTree(commit_list)
+        semantic_commits = commit_analyzer(
+            [commit_registry['4d17c1a']],
+            label_pattern='!{action}:{scope}',
+        )
+        release_data = ReleaseDataTree(semantic_commits)
         version = Version(major=10, minor=3, patch=0)
 
         markup = _render_release(
@@ -255,8 +283,11 @@ class Test_render_release:
     def test_release_with_features(self, commit_registry):
         reg = commit_registry
         version = Version(major=10, minor=3, patch=0)
-        commit_list = [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']]
-        release_data = ReleaseDataTree(commit_list)
+        semantic_commits = commit_analyzer(
+            [reg['ccaa185'], reg['bc0bcab'], reg['a6b655f']],
+            label_pattern='!{action}:{scope}',
+        )
+        release_data = ReleaseDataTree(semantic_commits)
         markup = _render_release(
             version,
             release_data=release_data,

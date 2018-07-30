@@ -12,6 +12,8 @@ DEFAULT_CONFIG.read_dict({
         'confirm': 'False',
         'changelog_file': DEFAULT_CHANGELOG,
         'files': '',
+        'label_pattern': '!{action}:{scope}',
+        'label_position': 'footer',
     }
 })
 
@@ -26,8 +28,11 @@ class Config:
         self._commit = config.getboolean('braulio', 'commit')
         self._tag = config.getboolean('braulio', 'tag')
         self._confirm = config.getboolean('braulio', 'confirm')
-        changelog_path = config.get('braulio', 'changelog_file').strip()
-        self._changelog_file = Path(changelog_path)
+        self._changelog_file = Path(
+            config.get('braulio', 'changelog_file').strip(),
+        )
+        self._label_pattern = config.get('braulio', 'label_pattern').strip()
+        self._label_position = config.get('braulio', 'label_position').strip()
 
         files_value = config.get('braulio', 'files').strip()
 
@@ -74,6 +79,14 @@ class Config:
     @property
     def files(self):
         return self._files
+
+    @property
+    def label_pattern(self):
+        return self._label_pattern
+
+    @property
+    def label_position(self):
+        return self._label_position
 
 
 def update_config_file(option, value):

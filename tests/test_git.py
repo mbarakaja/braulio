@@ -1,7 +1,8 @@
 import pytest
+from collections import namedtuple
 from subprocess import CalledProcessError, PIPE
 from unittest.mock import patch
-from braulio.git import _run_command, Git, Commit, Tag
+from braulio.git import _run_command, Git, Commit, Tag, commit_analyzer
 
 
 parametrize = pytest.mark.parametrize
@@ -82,6 +83,18 @@ class TestCommitClass:
         assert Commit(text).header == expected
 
     @parametrize(
+        'short_hash, expected',
+        [
+            ('4d17c1a', '!fix:thing Fixes #1'),
+            ('8c8dcb7', '!refactor:lorem'),
+            ('82f0d12', 'Sudo make me a sandwich.'),
+        ],
+    )
+    def test_footer(self, commit_text_registry, short_hash, expected):
+        text = commit_text_registry[short_hash]
+        assert Commit(text).footer == expected
+
+    @parametrize(
         'short_hash',
         ['80a9e0e', '2f9be68'],
         ids=['no line break before header', 'without body'],
@@ -134,39 +147,6 @@ class TestCommitClass:
     ):
         text = commit_text_registry[short_hash]
         assert Commit(text).body == expected
-
-    @parametrize(
-        'last_line, action, scope',
-        [
-            ('Random text', None, None),
-            ('!feat:cli', 'feat', 'cli'),
-            ('!feat:cli and some more text', 'feat', 'cli'),
-            ('Closed #2 and fixed #3 !feat:cli', 'feat', 'cli'),
-            ('!feat:', 'feat', None),
-            ('!feat: and some more text', 'feat', None),
-            ('Closed #2 and fixed #3 !feat:', 'feat', None),
-        ],
-    )
-    def test_action_and_scope_lookup(self, last_line, action, scope):
-
-        text = (
-            'commit eaedb9320c7aad581daa05f1510b64393c082dbb\n'
-            'Author: René Descartes <rene.decartes@xyz.test>\n'
-            'Date:   Thu Apr 19 14:11:05 2018 +0100\n'
-            '\n'
-            '    Fix lorem ipsum dolor sit amet\n'
-            '\n'
-            '    Consectetur adipiscing elit, sed do\n'
-            '    eiusmod tempor incididunt ut labore et\n'
-            '    dolore magna aliqua.\n'
-            '\n'
-            f'    {last_line}\n\n'
-        )
-
-        commit = Commit(text)
-
-        assert commit.scope == scope
-        assert commit.action == action
 
 
 class TestGitAdd:
@@ -310,3 +290,106 @@ class TestGitTag:
         mocked_run_command.assert_called_with(
             ['git', 'tag', '-a', 'tagname', '-m', '""'],
         )
+
+
+class Test_commit_analyzer:
+
+    # A substitution to braulio.git.Commit for test purpose
+    Commit = namedtuple('Commit', ['header', 'footer', 'message'])
+
+    @parametrize(
+        'label_pattern, header',
+        [
+            ('!{action}:{scope} {subject}', '!fix:cli Make it work'),
+            ('[{action}:{scope}] {subject}', '[fix:cli] Make it work'),
+            ('{action}({scope}): {subject}', 'fix(cli): Make it work'),
+            ('{action}({scope}): {subject}', 'fix(cli): Make it work'),
+        ],
+    )
+    def test_label_in_header(
+            self, isolated_filesystem, label_pattern, header):
+
+        commit = self.Commit(header=header, footer=None, message='')
+
+        with isolated_filesystem:
+
+            lst = commit_analyzer(
+                [commit],
+                label_pattern=label_pattern,
+                label_position='header'
+            )
+
+            assert len(lst) == 1
+            assert lst[0].subject == 'Make it work'
+            assert lst[0].scope == 'cli'
+            assert lst[0].action == 'fix'
+
+    @parametrize(
+        'label_pattern, footer',
+        [
+            ('!{action}:{scope}', '!fix:cli'),
+            ('[{action}:{scope}]', '[fix:cli]'),
+            ('{action}({scope}):', 'fix(cli):'),
+            ('{action}({scope})', 'fix(cli) Fixes #45 and closes #67'),
+        ],
+    )
+    def test_label_in_the_footer(
+            self, isolated_filesystem, label_pattern, footer):
+
+        commit = self.Commit(header='Make it work', footer=footer, message='')
+
+        with isolated_filesystem:
+
+            lst = commit_analyzer(
+                [commit],
+                label_pattern=label_pattern,
+                label_position='footer'
+            )
+
+            assert len(lst) == 1
+            assert lst[0].subject == 'Make it work'
+            assert lst[0].scope == 'cli'
+            assert lst[0].action == 'fix'
+
+    @parametrize(
+        'label_pattern, header',
+        [
+            ('!{action}:{scope} {subject}', '!fix: Make it work'),
+            ('[{action}:{scope}] {subject}', '[fix:] Make it work'),
+            ('{action}({scope}): {subject}', 'fix(): Make it work'),
+        ],
+    )
+    def test_scopeless_labels(
+            self, isolated_filesystem, label_pattern, header):
+
+        commit = self.Commit(header=header, footer=None, message='')
+
+        with isolated_filesystem:
+
+            lst = commit_analyzer(
+                [commit],
+                label_pattern=label_pattern,
+                label_position='header'
+            )
+
+            assert len(lst) == 1
+            assert lst[0].subject == 'Make it work'
+            assert lst[0].scope is None
+            assert lst[0].action == 'fix'
+
+    def test_scopeless_label_pattern(self, isolated_filesystem):
+
+        commit = self.Commit(header='Make it work', footer='!fix', message='')
+
+        with isolated_filesystem:
+
+            lst = commit_analyzer(
+                [commit],
+                label_pattern='!{action}',
+                label_position='footer'
+            )
+
+            assert len(lst) == 1
+            assert lst[0].subject == 'Make it work'
+            assert lst[0].scope is None
+            assert lst[0].action == 'fix'

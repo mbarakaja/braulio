@@ -10,9 +10,9 @@ DEFAULT_CHANGELOG = KNOWN_CHANGELOG_FILES[0]
 
 
 class ReleaseDataTree(UserDict):
-    """Takes a list of :class:`~braulio.git.Commit` objects, and classify them
-    by type of action (feat, fix, refactor, etc) and then by the scope of the
-    commit.
+    """Takes a list of :class:`~braulio.git.SemanticCommit` objects, and
+    classify them by type of action (feat, fix, refactor, etc) and then by
+    the scope of the commit.
 
     This is a dict like class, so, the found actions can be accessed normally
     by the key name.
@@ -20,14 +20,14 @@ class ReleaseDataTree(UserDict):
     Commits without an specified action are filter out.
     """
 
-    def __init__(self, commit_list):
+    def __init__(self, semantic_commits):
 
         self.data = {}
 
         # If this release is braking thing
         is_breaking = False
 
-        for commit in commit_list:
+        for commit in semantic_commits:
             if commit.action:
 
                 is_breaking = (

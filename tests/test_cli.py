@@ -223,6 +223,7 @@ class TestRelease:
             mock_git.tag.assert_called_with(f'v{expected}')
 
     @patch('braulio.cli.ReleaseDataTree')
+    @patch('braulio.cli.commit_analyzer')
     @patch('braulio.cli.update_chglog', autospec=True)
     @patch('braulio.cli.get_next_version')
     @patch('braulio.cli.Git', autospec=True)
@@ -231,6 +232,7 @@ class TestRelease:
         MockGit,
         mock_get_next_version,
         mock_update_chglog,
+        mock_commit_analyzer,
         MockReleaseDataTree,
     ):
         runner = CliRunner()
@@ -243,8 +245,14 @@ class TestRelease:
             mock_git = MockGit()
             mock_git.log.assert_called()
 
+            mock_commit_analyzer.assert_called_with(
+                mock_git.log(),
+                '!{action}:{scope}',
+                'footer',
+            )
+
             MockReleaseDataTree.assert_called_with(
-                mock_git.log()
+                mock_commit_analyzer()
             )
 
             release_data = MockReleaseDataTree()
@@ -403,6 +411,52 @@ class TestRelease:
                         in result.output
 
             assert 'Version 0.2.1 released successfully 🎉' in result.output
+
+    @patch('braulio.cli.commit_analyzer', autospec=True)
+    @patch('braulio.cli.Git', autospec=True)
+    def test_label_pattern_option(self, MockGit, mock_commit_analyzer):
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            result = runner.invoke(
+                cli,
+                ['release', '--label-pattern={action}:{scope}']
+            )
+
+            assert result.exit_code == 1, result.output
+
+            mock_git = MockGit()
+
+            mock_commit_analyzer.assert_called_with(
+                mock_git.log(),
+                '{action}:{scope}',
+                'footer',
+            )
+
+    @parametrize(
+        'label_pattern, label_position, err',
+        [
+            (' ', 'header', '{action} placeholder are required'),
+            (' ', 'footer', '{action} placeholder are required'),
+            ('{scope}', 'header', '{action} placeholder are required'),
+            ('{scope}', 'footer', '{action} placeholder are required'),
+            ('{action}', 'header', '{subject} placeholder are required'),
+        ]
+    )
+    @patch('braulio.cli.Git', autospec=True)
+    def test_invalid_label_pattern_option(
+            self, MockGit, label_pattern, label_position, err):
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            options = [f'--label-pattern={label_pattern}',
+                       f'--label-position={label_position}']
+            print(options)
+            result = runner.invoke(cli, ['release'] + options)
+
+            assert result.exit_code == 2, result.output
+            assert err in result.output
 
 
 @parametrize(

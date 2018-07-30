@@ -17,21 +17,62 @@ braulio
 Simplify software release by handling version bump and updating changelog file.
 
 Braulio inspects each commit message and determines the next version to be
-release based on a couple of conventions. Each commit message must have a tag
-in the footer with the format ``!<Type>:<scope>``, where ``<type>`` represents
-the commit type. There is no restriction on what value ``<type>`` can be at this
-time, but **feat** and **fix** are special, since commit with those types are
-included in the **changelog** file and determines the next version.
+released based on a couple of conventions. Each commit message must have a label
+with metadata information about the action and optionally the scope of the code
+being introduced.
 
-A commit example:
 
-.. code-block:: text
+Commit message convention
+-------------------------
+Braulio looks for commits that follow a given convention. The convention is
+defined by setting up the options ``label_pattern`` and ``label_position``, which
+are available through the CLI tool also.
 
-    Add music please
+``label_position =``
+  The posible values are **header** or **footer** (default). This option tell to
+  Braulio where to look for metatada information. 
+
+``label_pattern =``
+  This is not a regular expression, but instead is a pattern using placeholders,
+  where each placeholder represents a metadata information that should be
+  extracted from the commit message. The available placeholders are **{action}**,
+  **{scope}** and **{subject}**. ``{action}`` are always required, ``{scope}`` is
+  optional and  ``{subject}`` is required only if **label_position** is set to
+  ``header``. Everything else is treated in a literal way.
+
+
+Examples
+~~~~~~~~
+Given the next setup.cfg file:
+
+.. code-block:: ini
+
+    [braulio]
+    label_position = header
+    label_pattern = [{action}] {subject}
+
+The config above defines that the label must be localed in the header of the
+commit message and must meet the pattern ``[{action}] {subject}``. The next
+commit message header must match the pattern:
+
+.. code-block:: bash
+
+    [feat] Add music please
 
     Ok, I am going to change it
 
-    !feat:music
+The commit matches the message convention and the extracted information is:
+
+.. code-block:: python
+
+    {
+        'action': 'feat',
+        'scope': None,
+        'subject': 'Add music please'
+    }
+
+If the label is located in the footer, ``{subject}`` must be ommited since the
+entire header will be used as the subject value. 
 
 
 
