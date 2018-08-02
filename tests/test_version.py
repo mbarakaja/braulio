@@ -4,27 +4,26 @@ from braulio.version import validate_version_str, Version, get_next_version
 
 parametrize = pytest.mark.parametrize
 
+version_strings = [
+    ('1', True),
+    ('1.1', True),
+    ('1.1.1', True),
+    ('0', True),
+    ('0.0', True),
+    ('0.0.0', True),
+    ('1.0.0', True),
+    ('0.1.0', True),
+    ('0.0.1', True),
+    ('10.10.10', True),
+    ('010.010.010', True),
+    ('abc', False),
+    ('a.b.c', False),
+    ('1.1.1.1', False),
+    ('1.10.1', True),
+]
 
-@parametrize(
-    'string, expected',
-    [
-        ('1', False),
-        ('1.0', False),
-        ('a.b.c', False),
-        ('1.1.a', False),
-        ('12345', False),
-        ('abcd', False),
-        ('01.0.1', False),
-        ('1.01.1', False),
-        ('1.0.01', False),
-        ('1.1.1.1', False),
-        ('1.1.1', True),
-        ('1.10.1', True),
-        ('1.0.0', True),
-        ('0.1.0', True),
-        ('0.0.1', True),
-    ]
-)
+
+@parametrize('string, expected', version_strings)
 def test_validate_version_str(string, expected):
     assert validate_version_str(string) is expected
 

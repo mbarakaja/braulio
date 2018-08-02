@@ -75,6 +75,28 @@ If the label is located in the footer, ``{subject}`` must be ommited since the
 entire header will be used as the subject value. 
 
 
+Custom Git tag names
+--------------------
+
++-----------------------+--------------------+-------------------------------+
+|          CLI          |      Config File   |              Default          |
++-----------------------+--------------------+-------------------------------+
+|   ``--tag--patern``   |    tag_pattern     |            v{version}         |
++-----------------------+--------------------+-------------------------------+
+
+Pattern used to get and add release git tags. This is not a regular expression,
+Instead it must have the placehold field ``version`` surrounded by curly braces.
+The placeholder determines where a version string is located in a given tag
+name. Anything that is not contained in braces is considered literal text.
+
+Example
+~~~~~~~
+
+In order to match the tag ``release-1.0.0``, ``release-3`` and ``release-35.2``,
+the pattern must be ``release-{version}``. As stated above, any time a new
+version is released, the same pattern will be used as template to generate the
+new Git tag name. The new version string will fill the ``{version}`` placeholder.
+
 
 Installing
 ----------

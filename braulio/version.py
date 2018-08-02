@@ -1,12 +1,12 @@
 import re
 
 
-version_str_pattern = re.compile(
-    '^(?:(?!0)\d+|0)[.](?:(?!0)\d+|0)[.](?:(?!0)\d+|0)$')
+VERSION_STRING_REGEXP = re.compile(
+    '(?P<major>\d+)(?:\.(?P<minor>\d+))?(?:\.(?P<patch>\d+))?$')
 
 
 def validate_version_str(string):
-    return bool(re.match(version_str_pattern, string))
+    return bool(re.match(VERSION_STRING_REGEXP, string))
 
 
 class Version:

@@ -33,10 +33,9 @@ class TestRunCommand:
 @parametrize(
     'text, date, name',
     [
-        ('2015-10-15      v10.0.1', '2015-10-15', 'v10.0.1'),
-        ('2016-02-26      v0.10.13', '2016-02-26', 'v0.10.13'),
-        ('2016-07-06      v0.0.5', '2016-07-06', 'v0.0.5'),
-        ('2016-10-03      v0.70.6', '2016-10-03', 'v0.70.6'),
+        ('2015-10-15  v10.0.1', '2015-10-15', 'v10.0.1'),
+        ('2016-02-26   v0.10.13', '2016-02-26', 'v0.10.13'),
+        ('2016-07-06   save-point', '2016-07-06', 'save-point'),
     ]
 )
 def test_tag_class(text, date, name):
@@ -273,6 +272,7 @@ class TestGitTag:
             ],
         )
 
+        assert type(lst) == list
         assert len(lst) == expected
 
         if expected > 0:

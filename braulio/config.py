@@ -14,6 +14,7 @@ DEFAULT_CONFIG.read_dict({
         'files': '',
         'label_pattern': '!{action}:{scope}',
         'label_position': 'footer',
+        'tag_pattern': 'v{version}',
     }
 })
 
@@ -33,6 +34,7 @@ class Config:
         )
         self._label_pattern = config.get('braulio', 'label_pattern').strip()
         self._label_position = config.get('braulio', 'label_position').strip()
+        self._tag_pattern = config.get('braulio', 'tag_pattern').strip()
 
         files_value = config.get('braulio', 'files').strip()
 
@@ -87,6 +89,10 @@ class Config:
     @property
     def label_position(self):
         return self._label_position
+
+    @property
+    def tag_pattern(self):
+        return self._tag_pattern
 
 
 def update_config_file(option, value):

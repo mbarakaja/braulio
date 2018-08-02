@@ -3,7 +3,8 @@ from unittest.mock import patch
 from collections import namedtuple
 from datetime import date
 from pathlib import Path
-from braulio.git import Version, commit_analyzer
+from braulio.version import Version
+from braulio.git import commit_analyzer
 from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES, \
     _render_title, _render_subtitle, _render_list, _render_release, \
     update_chglog, update_files, is_title, _split_chglog, ReleaseDataTree

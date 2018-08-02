@@ -2,7 +2,6 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 from subprocess import run, PIPE, CalledProcessError
-from braulio.version import Version
 
 hash_pattern = re.compile('(?<=commit )\w{40}$', re.M)
 
@@ -25,10 +24,7 @@ def _run_git_tag_command():
 class Tag:
     def __init__(self, text):
         self.date = text[:10]
-        self.name = re.search('v\d+[.]\d+[.]\d+', text).group(0)
-        self.number = self.name[1:]
-
-        self.version = Version(self.name[1:])
+        self.name = text[10:].strip()
 
     def __str__(self):
         return f'Tag({self.version})'

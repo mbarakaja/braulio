@@ -1,8 +1,10 @@
+import re
 import click
 from pathlib import Path
 from click import style
 from braulio.git import Git, commit_analyzer
-from braulio.version import Version, validate_version_str, get_next_version
+from braulio.version import Version, validate_version_str, get_next_version, \
+    VERSION_STRING_REGEXP
 from braulio.config import Config, update_config_file
 from braulio.files import find_chglog_file, create_chglog_file, \
     update_chglog, update_files, ReleaseDataTree, DEFAULT_CHANGELOG
@@ -38,6 +40,7 @@ def cli(ctx):
             'confirm_flag': config.confirm,
             'label_position': config.label_position,
             'label_pattern': config.label_pattern,
+            'tag_pattern': config.tag_pattern,
         }
     }
 
@@ -122,13 +125,16 @@ def changelog_file_callback(ctx, param, value):
               help='Where the label is located in the commit message.')
 @click.option('--label-pattern',
               help='Pattern to identify labels in commit messages.')
+@click.option('--tag-pattern',
+              help='Pattern for Git tags that represent versions')
 @click.option('-y', 'confirm_flag', is_flag=True, default=False,
               help="Don't ask for confirmation")
 @click.argument('files', nargs=-1, type=click.Path(exists=True),
                 callback=files_callback)
 @click.pass_context
 def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
-            changelog_file, files, label_pattern, label_position):
+            changelog_file, files, label_pattern, label_position,
+            tag_pattern):
 
     """Release a new version.
 
@@ -150,13 +156,21 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
 
     git = Git()
     current_version = None
-    last_tag_name = None
+    current_tag_name = None
 
-    if git.tags:
-        last_tag_name = git.tags[0].name
-        current_version = git.tags[0].version
+    tag_name_pattern = re.escape(tag_pattern) \
+        .replace(r'\{version\}', VERSION_STRING_REGEXP.pattern)
+    tag_regex = re.compile(tag_name_pattern)
 
-    commit_list = git.log(_from=last_tag_name)
+    for tag in git.tags:
+        tag_version_match = tag_regex.match(tag.name)
+
+        if tag_version_match:
+            current_version = Version(**tag_version_match.groupdict())
+            current_tag_name = tag.name
+            break
+
+    commit_list = git.log(_from=current_tag_name)
 
     msg(f'{label("Current version")} {current_version}')
     msg(f'{label("Commits found")} {len(commit_list)} since last release')
@@ -181,6 +195,7 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
     current_version = current_version or Version()
 
     new_version = get_next_version(bump_version_to, current_version)
+    new_tag_name = tag_pattern.format(version=new_version.string)
 
     msg(f'{label("New version")} {new_version}')
     msg(f'{label("Changelog file")} {changelog_file.name}')
@@ -189,7 +204,7 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
     msg('Braulio will perform the next tasks :')
     msg(f'        Update {len(files) + 1} files.', prefix='')
     msg('        Add a release commit.', prefix='', silence=not commit_flag)
-    msg(f'        Tag the repository with v{new_version.string}', prefix='',
+    msg(f'        Tag the repository with {new_tag_name}', prefix='',
         silence=not tag_flag)
 
     msg('', prefix='')  # Print just a new line
@@ -232,9 +247,8 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
             msg(f' {check_mark}', prefix='')
 
         if tag_flag:
-            tagname = 'v' + new_version.string
-            msg(f'Add tag {tagname}', nl=False)
-            git.tag(tagname)
+            msg(f'Add tag {new_tag_name}', nl=False)
+            git.tag(new_tag_name)
             msg(f' {check_mark}', prefix='')
 
         msg(f'Version {new_version} released successfully', suffix=' 🎉')
