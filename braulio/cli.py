@@ -104,6 +104,13 @@ def changelog_file_callback(ctx, param, value):
     return config.changelog_file
 
 
+def tag_pattern_callback(ctx, param, value):
+    if not value or '{version}' not in value:
+        msg('Missing {version} placeholder in tag_pattern.')
+        ctx.abort()
+    return value
+
+
 @cli.command()
 @click.option('--major', 'bump_type', flag_value='major',
               help='Major version bump.')
@@ -126,6 +133,7 @@ def changelog_file_callback(ctx, param, value):
 @click.option('--label-pattern',
               help='Pattern to identify labels in commit messages.')
 @click.option('--tag-pattern',
+              callback=tag_pattern_callback,
               help='Pattern for Git tags that represent versions')
 @click.option('-y', 'confirm_flag', is_flag=True, default=False,
               help="Don't ask for confirmation")
