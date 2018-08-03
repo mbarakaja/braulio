@@ -1,16 +1,20 @@
 import pytest
+from click import Context
 from collections import namedtuple
 from configparser import ConfigParser
 from unittest.mock import patch
 from pathlib import Path
 from click.testing import CliRunner
-from braulio.cli import cli
+from braulio.cli import cli, release, current_version_callback
 from braulio.git import Tag
 from braulio.version import Version
 from braulio.files import DEFAULT_CHANGELOG, KNOWN_CHANGELOG_FILES
 
 
 parametrize = pytest.mark.parametrize
+
+
+FakeTag = namedtuple('FakeTag', ['name'])
 
 
 @pytest.fixture(params=KNOWN_CHANGELOG_FILES)
@@ -590,3 +594,99 @@ def test_invalid_tag_pattern_option(MockGit, options, cfg_value):
 
         assert result.exit_code == 1
         assert 'Missing {version} placeholder in tag_pattern' in result.output
+
+
+@parametrize(
+    'tags, value, expected_version, expected_tag',
+    [
+        ([], None, None, None),
+        ([], '0.12.0', Version('0.12.0'), None),
+        (
+            [FakeTag('v2.0.0'), FakeTag('v1.9.10')],
+            None,
+            Version('2.0.0'),
+            FakeTag('v2.0.0'),
+        ),
+        ([FakeTag('v2.0.0')], '3.0.0', Version('3.0.0'), None),
+        ([FakeTag('v4.0.0')], '2.0.0', Version('2.0.0'), None),
+        ([FakeTag('save-point')], '3.0.0', Version('3.0.0'), None),
+        ([FakeTag('save-point')], None, None, None),
+    ],
+)
+@patch('braulio.cli.Git')
+def test_current_version_callback(
+        MockGit, tags, value, expected_version, expected_tag):
+    mock_git = MockGit()
+    mock_git.tags = tags
+    ctx = Context(release)
+    ctx.params['tag_pattern'] = 'v{version}'
+
+    version = current_version_callback(ctx, {}, value)
+
+    assert version == expected_version
+
+    if expected_tag:
+        assert ctx.params['current_tag'] == expected_tag
+
+
+@parametrize(
+    'cfg_value, options',
+    [
+        ({'current_version': 'invalid'}, []),
+        ({'current_version': 'invalid'}, ['--current-version=invalid']),
+        ({}, ['--current-version=invalid']),
+    ],
+)
+@patch('braulio.cli.Git')
+def test_invalid_current_version_option(MockGit, options, cfg_value):
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        Path('HISTORY.rst').touch()
+
+        with open('setup.cfg', 'w') as config_file:
+            config_parser = ConfigParser()
+            config_parser['braulio'] = cfg_value
+            config_parser.write(config_file)
+
+        command = ['release'] + options + ['-y']
+        result = runner.invoke(cli, command)
+
+        assert result.exit_code == 1
+        assert 'invalid is not a valid version string' in result.output
+
+
+@parametrize(
+    'cfg_value, options, expected',
+    [
+        ({'current_version': '2.0.0'}, [], '2.0.1'),
+        ({'current_version': '2.0.0'}, ['--current-version=2.0.0'], '2.0.1'),
+        ({}, ['--current-version=2.0.0'], None),
+        ({}, [], None),
+    ],
+)
+@patch('braulio.cli.Git')
+def test_current_version_cfg_option_update(
+        MockGit, cfg_value, options, expected):
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        Path('HISTORY.rst').touch()
+
+        mock_git = MockGit()
+        mock_git.tags = [FakeTag(name='v2.0.0')]
+
+        with open('setup.cfg', 'w') as config_file:
+            config_parser = ConfigParser()
+            config_parser['braulio'] = cfg_value
+            config_parser.write(config_file)
+
+        command = ['release', '-y'] + options
+        result = runner.invoke(cli, command)
+
+        assert result.exit_code == 0
+
+        cfg = ConfigParser()
+        cfg.read('setup.cfg')
+
+        assert cfg.get('braulio', 'current_version', fallback=None) == expected

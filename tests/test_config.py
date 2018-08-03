@@ -10,11 +10,7 @@ parametrize = pytest.mark.parametrize
 
 class TestConfig:
 
-    def test_default_options(self, isolated_filesystem):
-
-        with isolated_filesystem:
-            config = Config()
-
+    def check_default_options(self, config):
         assert config.tag is True
         assert config.commit is True
         assert config.confirm is False
@@ -23,6 +19,27 @@ class TestConfig:
         assert config.label_position == 'footer'
         assert config.label_pattern == '!{action}:{scope}'
         assert config.tag_pattern == 'v{version}'
+        assert config.current_version is None
+
+    def test_default_options(self, isolated_filesystem):
+
+        with isolated_filesystem:
+            config = Config()
+            self.check_default_options(config)
+
+    def test_cfg_file_property(self, isolated_filesystem):
+
+        with isolated_filesystem:
+            file_path = Path.cwd() / 'setup.cfg'
+            file_path.write_text(
+                '[braulio]\n'
+                'option1 = value1\n'
+                'option2 = value2\n'
+            )
+
+            config = Config()
+            config.cfg_file_options == {'option1': 'value1',
+                                        'option2': 'value2'}
 
     def test_config_file_with_not_braulio_section(self, isolated_filesystem):
         config_file_content = (
@@ -36,11 +53,7 @@ class TestConfig:
             file_path.write_text(config_file_content)
 
             config = Config()
-
-        assert config.tag is True
-        assert config.commit is True
-        assert config.confirm is False
-        assert config.files == ()
+            self.check_default_options(config)
 
     def test_merge_options_from_config_file(self, isolated_filesystem):
         config_file_content = (
@@ -120,6 +133,17 @@ class TestConfig:
         assert config.tag is expected['tag']
         assert config.commit is expected['commit']
         assert config.confirm is expected['confirm']
+
+    def test_current_version_option(self, isolated_filesystem):
+        with isolated_filesystem:
+            file_path = Path.cwd() / 'setup.cfg'
+            file_path.write_text(
+                '[braulio]\n'
+                'current_version = 4.9.3\n'
+            )
+
+            config = Config()
+            config.current_version == '4.9.3'
 
 
 class TestUpdateConfigFile:

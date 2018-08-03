@@ -41,6 +41,7 @@ def cli(ctx):
             'label_position': config.label_position,
             'label_pattern': config.label_pattern,
             'tag_pattern': config.tag_pattern,
+            'current_version': config.current_version,
         }
     }
 
@@ -111,6 +112,45 @@ def tag_pattern_callback(ctx, param, value):
     return value
 
 
+def current_version_callback(ctx, param, value):
+    current_version = None
+
+    if value:
+        match = VERSION_STRING_REGEXP.match(value)
+
+        if not match:
+            msg(f'{value} is not a valid version string')
+            ctx.abort()
+
+        params = match.groupdict(default=0)
+        current_version = Version(**params)
+
+    # Look for the last git tag for the curren version
+    git = Git()
+    tag_pattern = ctx.params['tag_pattern']
+
+    if current_version:
+        tag_name_pattern = re.escape(
+            tag_pattern.format(version=current_version.string))
+    else:
+        tag_name_pattern = re.escape(tag_pattern) \
+            .replace(r'\{version\}', VERSION_STRING_REGEXP.pattern)
+
+    tag_regex = re.compile(tag_name_pattern)
+
+    for tag in git.tags:
+        tag_version_match = tag_regex.match(tag.name)
+
+        if tag_version_match:
+            ctx.params['current_tag'] = tag
+
+            if not current_version:
+                current_version = Version(**tag_version_match.groupdict())
+            break
+
+    return current_version
+
+
 @cli.command()
 @click.option('--major', 'bump_type', flag_value='major',
               help='Major version bump.')
@@ -134,7 +174,11 @@ def tag_pattern_callback(ctx, param, value):
               help='Pattern to identify labels in commit messages.')
 @click.option('--tag-pattern',
               callback=tag_pattern_callback,
+              is_eager=True,
               help='Pattern for Git tags that represent versions')
+@click.option('--current-version',
+              help='Manually specify the curren version.',
+              callback=current_version_callback)
 @click.option('-y', 'confirm_flag', is_flag=True, default=False,
               help="Don't ask for confirmation")
 @click.argument('files', nargs=-1, type=click.Path(exists=True),
@@ -142,7 +186,7 @@ def tag_pattern_callback(ctx, param, value):
 @click.pass_context
 def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
             changelog_file, files, label_pattern, label_position,
-            tag_pattern):
+            tag_pattern, current_version, current_tag=None):
 
     """Release a new version.
 
@@ -163,21 +207,7 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
                                  ' so {subject} placeholder are required')
 
     git = Git()
-    current_version = None
-    current_tag_name = None
-
-    tag_name_pattern = re.escape(tag_pattern) \
-        .replace(r'\{version\}', VERSION_STRING_REGEXP.pattern)
-    tag_regex = re.compile(tag_name_pattern)
-
-    for tag in git.tags:
-        tag_version_match = tag_regex.match(tag.name)
-
-        if tag_version_match:
-            current_version = Version(**tag_version_match.groupdict())
-            current_tag_name = tag.name
-            break
-
+    current_tag_name = current_tag.name if current_tag else None
     commit_list = git.log(_from=current_tag_name)
 
     msg(f'{label("Current version")} {current_version}')
@@ -258,6 +288,9 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
             msg(f'Add tag {new_tag_name}', nl=False)
             git.tag(new_tag_name)
             msg(f' {check_mark}', prefix='')
+
+        if 'current_version' in ctx.obj.cfg_file_options:
+            update_config_file('current_version', new_version.string)
 
         msg(f'Version {new_version} released successfully', suffix=' 🎉')
 

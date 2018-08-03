@@ -21,22 +21,25 @@ DEFAULT_CONFIG.read_dict({
 
 class Config:
 
+    cfg_file_options = {}
+
     def __init__(self):
 
-        config = self._load_config_file()
+        cfg = self._load_config_file()
 
-        self.config_parser = config
-        self._commit = config.getboolean('braulio', 'commit')
-        self._tag = config.getboolean('braulio', 'tag')
-        self._confirm = config.getboolean('braulio', 'confirm')
+        self.config_parser = cfg
+        self._commit = cfg.getboolean('braulio', 'commit')
+        self._tag = cfg.getboolean('braulio', 'tag')
+        self._confirm = cfg.getboolean('braulio', 'confirm')
         self._changelog_file = Path(
-            config.get('braulio', 'changelog_file').strip(),
-        )
-        self._label_pattern = config.get('braulio', 'label_pattern').strip()
-        self._label_position = config.get('braulio', 'label_position').strip()
-        self._tag_pattern = config.get('braulio', 'tag_pattern').strip()
+            cfg.get('braulio', 'changelog_file').strip())
+        self._label_pattern = cfg.get('braulio', 'label_pattern').strip()
+        self._label_position = cfg.get('braulio', 'label_position').strip()
+        self._tag_pattern = cfg.get('braulio', 'tag_pattern').strip()
+        self._current_version = cfg.get('braulio', 'current_version',
+                                        fallback=None)
 
-        files_value = config.get('braulio', 'files').strip()
+        files_value = cfg.get('braulio', 'files').strip()
 
         if files_value == '':
             self._files = ()
@@ -51,16 +54,19 @@ class Config:
 
     def _load_config_file(self):
         path = Path.cwd() / 'setup.cfg'
-        setup_config = ConfigParser()
+        setup_cfg = ConfigParser()
 
         if path.exists() and path.is_file():
-            setup_config.read(path)
+            setup_cfg.read(path)
 
-        config = ConfigParser()
-        config.read_dict(DEFAULT_CONFIG)
-        config.read_dict(setup_config)
+            if setup_cfg.has_section('braulio'):
+                self.cfg_file_options = dict(setup_cfg.items('braulio'))
 
-        return config
+        cfg = ConfigParser()
+        cfg.read_dict(DEFAULT_CONFIG)
+        cfg.read_dict(setup_cfg)
+
+        return cfg
 
     @property
     def commit(self):
@@ -93,6 +99,10 @@ class Config:
     @property
     def tag_pattern(self):
         return self._tag_pattern
+
+    @property
+    def current_version(self):
+        return self._current_version
 
 
 def update_config_file(option, value):
