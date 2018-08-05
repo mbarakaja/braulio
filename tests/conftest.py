@@ -1,5 +1,6 @@
 import os
 import pytest
+from configparser import ConfigParser
 from shutil import copytree
 from pathlib import Path
 from braulio.git import _extract_commit_texts, Commit
@@ -9,13 +10,31 @@ class IsolatedFilesystem:
 
     def __init__(self, tmpdir):
         self.tmpdir = tmpdir
+        self.chglog = None
+        self.cfg = None
 
     def __enter__(self):
         self.original_dir = self.tmpdir.chdir()
+
+        if self.chglog:
+            Path(self.chglog).touch()
+
+        if self.cfg:
+            with open('setup.cfg', 'w') as config_file:
+                config_parser = ConfigParser()
+                config_parser['braulio'] = self.cfg
+                config_parser.write(config_file)
+
         return self
 
     def __exit__(self, *args):
         os.chdir(self.original_dir)
+
+    def __call__(self, chglog=None, cfg=None):
+        self.chglog = chglog
+        self.cfg = cfg
+
+        return self
 
 
 class FakeRepository:

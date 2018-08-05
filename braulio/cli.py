@@ -42,6 +42,7 @@ def cli(ctx):
             'label_pattern': config.label_pattern,
             'tag_pattern': config.tag_pattern,
             'current_version': config.current_version,
+            'changelog_file': config.changelog_file,
         }
     }
 
@@ -94,15 +95,24 @@ def files_callback(ctx, param, value):
     return config.files
 
 
-def changelog_file_callback(ctx, param, value):
-    '''Return --changelog-file input as Path object if provided, otherwise
-    Config.changelog_file.'''
+def changelog_file_option_validator(ctx, param, value):
+    """Checks that the given file path exists in the current working directory.
 
-    if value:
-        return Path(value)
+    Returns a :class:`~pathlib.Path` object. If the file does not exist raises
+    a :class:`~click.UsageError` exception.
+    """
 
-    config = ctx.obj
-    return config.changelog_file
+    path = Path(value)
+
+    if not path.exists():
+        filename = click.style(path.name, fg='blue', bold=True)
+        ctx.fail(
+            '\n'
+            f' {x_mark} Unable to find {filename}\n'
+            '   Run "$ brau init" to create one'
+        )
+
+    return path
 
 
 def tag_pattern_callback(ctx, param, value):
@@ -196,8 +206,8 @@ def label_pattern_option_validator(ctx, param, value):
 @click.option('--tag/--no-tag', 'tag_flag', default=True,
               help='Enable/disable version tagging.')
 @click.option('--changelog-file', 'changelog_file',
-              type=click.Path(exists=True),
-              callback=changelog_file_callback,
+              type=click.Path(),
+              callback=changelog_file_option_validator,
               help='Specify the changelog file.')
 @click.option('--label-position',
               type=click.Choice(['header', 'footer']),
@@ -273,21 +283,12 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
 
         msg('Update changelog ', nl=False)
 
-        try:
-            update_chglog(
-                changelog_file,
-                new_version=new_version,
-                current_version=current_version,
-                release_data=release_data,
-            )
-        except FileNotFoundError:
-            msg(x_mark, prefix='')
-            filename = click.style(changelog_file.name, fg='blue', bold=True)
-            click.echo(
-                f' {x_mark} Unable to find {filename}\n'
-                '   Run "$ brau init" to create one'
-            )
-            ctx.abort()
+        update_chglog(
+            changelog_file,
+            new_version=new_version,
+            current_version=current_version,
+            release_data=release_data,
+        )
 
         msg(check_mark, prefix='')
 

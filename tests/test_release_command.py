@@ -9,7 +9,7 @@ from click.testing import CliRunner
 from braulio.git import Tag
 from braulio.version import Version
 from braulio.cli import cli, release, current_version_callback, \
-    label_pattern_option_validator
+    label_pattern_option_validator, changelog_file_option_validator
 
 parametrize = pytest.mark.parametrize
 
@@ -59,10 +59,12 @@ def test_commitless_repository(MockGit):
 @parametrize('_input', ['y', 'n'])
 @patch('braulio.cli.update_chglog')
 @patch('braulio.cli.Git', autospec=True)
-def test_confirmation_prompt(MockGit, mock_update_chglog, _input):
+def test_confirmation_prompt(
+        MockGit, mock_update_chglog, _input, isolated_filesystem):
+
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release'], input=_input)
 
         exit_code = 0 if _input == 'y' else 1
@@ -93,13 +95,14 @@ def test_confirmation_prompt(MockGit, mock_update_chglog, _input):
 @patch('braulio.cli.update_chglog', autospec=True)
 @patch('braulio.cli.Git', autospec=True)
 def test_manual_version_bump(MockGit, mock_update_chglog, option,
-                             tags, current_version, expected):
+                             tags, current_version, expected,
+                             isolated_filesystem):
 
     mock_git = MockGit()
     mock_git.tags = tags
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release', option], input='y')
 
         assert result.exit_code == 0
@@ -139,6 +142,7 @@ def test_determine_next_version_from_commit_messages(
     tags,
     expected,
     commit_registry,
+    isolated_filesystem,
 ):
     mock_git = MockGit()
     mock_git.tags = tags
@@ -148,7 +152,7 @@ def test_determine_next_version_from_commit_messages(
 
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release', '-y'])
 
         assert result.exit_code == 0, result.exception
@@ -177,12 +181,13 @@ def test_call_to_update_changelog(
     mock_update_chglog,
     mock_commit_analyzer,
     MockReleaseDataTree,
+    isolated_filesystem,
 ):
     runner = CliRunner()
     mock_git = MockGit()
     mock_git.tags = []
 
-    with runner.isolated_filesystem():
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release', '-y'])
 
         assert result.exit_code == 0
@@ -214,15 +219,29 @@ def test_call_to_update_changelog(
         )
 
 
+def test_changelog_file_option_validator(ctx, isolated_filesystem):
+    with isolated_filesystem('FILE'):
+        path = changelog_file_option_validator(ctx, {}, 'FILE')
+
+        assert path == Path('FILE')
+
+
+def test_changelog_file_option_validator_with_missing_file(
+        ctx, isolated_filesystem):
+
+    with isolated_filesystem:
+        with pytest.raises(UsageError):
+            changelog_file_option_validator(ctx, {}, 'MISSING_FILE')
+
+
 @patch('braulio.cli.Git', autospec=True)
 def test_changelog_not_found(MockGit):
     runner = CliRunner()
 
     with runner.isolated_filesystem():
-
         result = runner.invoke(cli, ['release', '-y'])
 
-        assert result.exit_code == 1, result.exc_info
+        assert result.exit_code == 2
         assert 'Unable to find HISTORY.rst' in result.output
         assert 'Run "$ brau init" to create one' in result.output
 
@@ -310,11 +329,10 @@ def test_output_after_confirmation_prompt(
     mock_git.tags = [FakeTag('v0.2.0')]
     mock_git.log.return_value = commit_list
 
-    with isolated_filesystem:
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release'] + options)
 
         assert result.exit_code == 1, result.output
-
         assert ' › Current version  : 0.2.0' in result.output
         assert f' › Commits found    : {len(commit_list)}' in result.output
         assert ' › New version      :' in result.output
@@ -345,9 +363,7 @@ def test_output_before_confirmation_prompt(
     mock_git.tags = [Tag('v0.2.0')]
     mock_git.log.return_value = commit_list
 
-    with isolated_filesystem:
-        Path('HISTORY.rst').touch()
-
+    with isolated_filesystem('HISTORY.rst'):
         result = runner.invoke(cli, ['release'] + options, input='y')
 
         assert result.exit_code == 0, result.output
