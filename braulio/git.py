@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import NamedTuple
 from subprocess import run, PIPE, CalledProcessError
 
-hash_pattern = re.compile('(?<=commit )\w{40}$', re.M)
+hash_pattern = re.compile("(?<=commit )\w{40}$", re.M)
 
 
 def _run_command(command):
@@ -13,10 +13,10 @@ def _run_command(command):
 
 def _run_git_tag_command():
     command = [
-        'git',
-        'tag',
-        '--sort=creatordate',
-        '--format=%(creatordate:short)%09%(refname:strip=2)',
+        "git",
+        "tag",
+        "--sort=creatordate",
+        "--format=%(creatordate:short)%09%(refname:strip=2)",
     ]
     return _run_command(command)
 
@@ -27,24 +27,23 @@ class Tag:
         self.name = text[10:].strip()
 
     def __str__(self):
-        return f'Tag({self.version})'
+        return f"Tag({self.version})"
 
     def __repr__(self):
-        return f'Tag({self.version})'
+        return f"Tag({self.version})"
 
 
 class Commit:
-
     def __init__(self, text):
         self.text = text
-        lines = text.strip().split('\n')
+        lines = text.strip().split("\n")
 
         # Commit hash
         self.hash = lines[0][7:]
 
         # Commit message
         msg_lines = [line[4:] for line in lines[4:]]
-        self.message = '\n'.join(msg_lines)
+        self.message = "\n".join(msg_lines)
 
         # Commit message header
         self.header = msg_lines[0]
@@ -53,14 +52,14 @@ class Commit:
         # Commit message body
         self.body = None
 
-        if len(msg_lines) > 2 and msg_lines[1] == '':
-            self.body = '\n'.join(msg_lines[2:])
+        if len(msg_lines) > 2 and msg_lines[1] == "":
+            self.body = "\n".join(msg_lines[2:])
 
     def __repr__(self):
-        return f'Commit(\'{self.header}\')'
+        return f"Commit('{self.header}')"
 
 
-patter = re.compile('^commit (?:.+?(?=commit \w{40})|.+$)', flags=re.M | re.S)
+patter = re.compile("^commit (?:.+?(?=commit \w{40})|.+$)", flags=re.M | re.S)
 
 
 def _extract_commit_texts(git_log_text):
@@ -68,19 +67,18 @@ def _extract_commit_texts(git_log_text):
 
 
 class Git:
-
     def add(self, *files):
         """Add one or more files to the index running git-add."""
 
         try:
-            _run_command(('git', 'add') + files)
+            _run_command(("git", "add") + files)
         except CalledProcessError:
             # Only if the command fails we check if the files
             # exist, because git-add most of the time fails when
             # the provided files are not found.
             for f in files:
                 if not Path(f).exists():
-                    raise FileNotFoundError(f'No such file or directory: {f}')
+                    raise FileNotFoundError(f"No such file or directory: {f}")
 
     def commit(self, message, files=None):
         """Run git-commit."""
@@ -88,16 +86,16 @@ class Git:
         if files:
             self.add(*files)
 
-        return _run_command(['git', 'commit', '-m', f'"{message}"'])
+        return _run_command(["git", "commit", "-m", f'"{message}"'])
 
     def log(self, _from=None, to=None):
         """Run git-log."""
 
-        command = ['git', 'log']
+        command = ["git", "log"]
 
         if _from:
-            to = 'HEAD' if not to else to
-            revision_range = f'{_from}..{to}'
+            to = "HEAD" if not to else to
+            revision_range = f"{_from}..{to}"
             command.append(revision_range)
 
         git_log_text = _run_command(command)
@@ -108,31 +106,33 @@ class Git:
     def tag(self, name=None):
         """Create and list tag objects running git-tag command"""
 
-        command = ['git', 'tag']
+        command = ["git", "tag"]
 
         if not name:
-            command.extend([
-                '-l',
-                '--sort=creatordate',
-                '--format=%(creatordate:short)%09%(refname:strip=2)',
-            ])
+            command.extend(
+                [
+                    "-l",
+                    "--sort=creatordate",
+                    "--format=%(creatordate:short)%09%(refname:strip=2)",
+                ]
+            )
 
             command_output = _run_command(command).strip()
 
-            if command_output == '':
+            if command_output == "":
                 return []
 
-            tag_text_list = command_output.split('\n')
+            tag_text_list = command_output.split("\n")
             tag_list = [Tag(text) for text in tag_text_list]
 
             return list(reversed(tag_list))
 
-        command.extend(['-a', name, '-m', '""'])
+        command.extend(["-a", name, "-m", '""'])
         return _run_command(command)
 
     @property
     def tags(self):
-        if not hasattr(self, '_tag_list'):
+        if not hasattr(self, "_tag_list"):
             self._tag_list = self.tag()
         return self._tag_list
 
@@ -144,7 +144,7 @@ class SemanticCommit(NamedTuple):
     scope: str
 
 
-def commit_analyzer(commits, label_pattern, label_position='footer'):
+def commit_analyzer(commits, label_pattern, label_position="footer"):
     """Analyzes a list of :class:`~braulio.git.Commit` objects searching for
     messages that match a given message convention and extract metadata from
     them.
@@ -182,24 +182,22 @@ def commit_analyzer(commits, label_pattern, label_position='footer'):
     pattern_string = re.escape(label_pattern)
 
     # Capturing group patterns
-    action_cgp = r'(?P<action>\w+)'
-    scope_cgp = r'(?P<scope>\w*)'
-    subject_cgp = r'(?P<subject>.+)'
+    action_cgp = r"(?P<action>\w+)"
+    scope_cgp = r"(?P<scope>\w*)"
+    subject_cgp = r"(?P<subject>.+)"
 
-    pattern_string = pattern_string \
-        .replace(r'\{action\}', action_cgp) \
-        .replace(r'\{scope\}', scope_cgp) \
-
-    if label_position == 'header':
-        pattern_string = pattern_string \
-            .replace(r'\{subject\}', subject_cgp)
+    pattern_string = pattern_string.replace(r"\{action\}", action_cgp).replace(
+        r"\{scope\}", scope_cgp
+    )
+    if label_position == "header":
+        pattern_string = pattern_string.replace(r"\{subject\}", subject_cgp)
 
     regexp_pattern = re.compile(pattern_string)
 
     semantic_commits = []
 
     for commit in commits:
-        text = commit.header if label_position == 'header' else commit.footer
+        text = commit.header if label_position == "header" else commit.footer
         match = regexp_pattern.search(text)
 
         if not match:
@@ -207,13 +205,13 @@ def commit_analyzer(commits, label_pattern, label_position='footer'):
 
         metadata = match.groupdict()
 
-        if label_position == 'footer':
-            metadata['subject'] = commit.header
+        if label_position == "footer":
+            metadata["subject"] = commit.header
 
         sc = SemanticCommit(
-            subject=metadata['subject'].strip(),
-            action=metadata['action'],
-            scope=metadata.get('scope') or None,
+            subject=metadata["subject"].strip(),
+            action=metadata["action"],
+            scope=metadata.get("scope") or None,
             message=commit.message,
         )
 
