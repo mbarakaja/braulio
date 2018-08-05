@@ -151,6 +151,37 @@ def current_version_callback(ctx, param, value):
     return current_version
 
 
+def label_pattern_option_validator(ctx, param, value):
+    '''Checks that a given string has all the required placeholders. The
+    possible placeholders are **{action}**, **{scope}** and **{subject}**.
+
+    ``{action}`` are always required, ``{scope}`` is optional and
+    ``{subject}`` are required only when ``label_position`` option is set to
+    ``header``.
+
+    If the pattern is invalid, raises :class:`click.UsageError`.
+    '''
+
+    missings = []
+    label_position = ctx.params['label_position']
+
+    if '{action}' not in value:
+        missings.append(style('{action}', fg='red', bold=True))
+
+    if label_position == 'header' and '{subject}' not in value:
+        missings.append(style('{subject}', fg='red', bold=True))
+
+    if missings:
+        message = '\n'
+
+        for placeholder in missings:
+            message += f'  {x_mark} Missing {placeholder} placeholder.\n'
+
+        ctx.fail(message)
+
+    return value
+
+
 @cli.command()
 @click.option('--major', 'bump_type', flag_value='major',
               help='Major version bump.')
@@ -168,9 +199,12 @@ def current_version_callback(ctx, param, value):
               type=click.Path(exists=True),
               callback=changelog_file_callback,
               help='Specify the changelog file.')
-@click.option('--label-position', type=click.Choice(['header', 'footer']),
+@click.option('--label-position',
+              type=click.Choice(['header', 'footer']),
+              is_eager=True,
               help='Where the label is located in the commit message.')
 @click.option('--label-pattern',
+              callback=label_pattern_option_validator,
               help='Pattern to identify labels in commit messages.')
 @click.option('--tag-pattern',
               callback=tag_pattern_callback,
@@ -193,18 +227,6 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
     Determines the next version by inspecting commit messages, updates the
     changelog, commit the changes and tag the repository with the new version.
     """
-
-    # Validate --label-pattern
-    #
-    # The reason for validating this here and not in a callback is because
-    # Click doesn't provide --label-position in ctx.params when --label-pattern
-    # is used alone in the CLI tool.
-    if '{action}' not in label_pattern:
-            raise click.BadParameter('{action} placeholder are required')
-
-    if label_position == 'header' and '{subject}' not in label_pattern:
-        raise click.BadParameter('The label is in the header,'
-                                 ' so {subject} placeholder are required')
 
     git = Git()
     current_tag_name = current_tag.name if current_tag else None

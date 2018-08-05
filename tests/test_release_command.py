@@ -1,19 +1,24 @@
 import pytest
-from click import Context
 from collections import namedtuple
 from configparser import ConfigParser
 from unittest.mock import patch
 from pathlib import Path
+from click import Context
+from click.exceptions import UsageError
 from click.testing import CliRunner
-from braulio.cli import cli, release, current_version_callback
 from braulio.git import Tag
 from braulio.version import Version
-
+from braulio.cli import cli, release, current_version_callback, \
+    label_pattern_option_validator
 
 parametrize = pytest.mark.parametrize
 
-
 FakeTag = namedtuple('FakeTag', ['name'])
+
+
+@pytest.fixture
+def ctx():
+    return Context(release)
 
 
 @parametrize(
@@ -358,52 +363,54 @@ def test_output_before_confirmation_prompt(
         assert 'Version 0.2.1 released successfully 🎉' in result.output
 
 
-@patch('braulio.cli.commit_analyzer', autospec=True)
-@patch('braulio.cli.Git', autospec=True)
-def test_label_pattern_option(MockGit, mock_commit_analyzer):
-    runner = CliRunner()
+@parametrize(
+    'label_position, value',
+    [
+        ('header', ''),
+        ('header', '{subject}'),
+        ('header', '{action}:{scope}'),
+        ('footer', '{subject}'),
+    ]
+)
+def test_invalid_label_pattern_option(ctx, label_position, value):
+    ctx.params['label_position'] = label_position
 
-    with runner.isolated_filesystem():
-        result = runner.invoke(
-            cli,
-            ['release', '--label-pattern={action}:{scope}']
-        )
-
-        assert result.exit_code == 1, result.output
-
-        mock_git = MockGit()
-
-        mock_commit_analyzer.assert_called_with(
-            mock_git.log(),
-            '{action}:{scope}',
-            'footer',
-        )
+    with pytest.raises(UsageError):
+        label_pattern_option_validator(ctx, {}, value)
 
 
 @parametrize(
-    'label_pattern, label_position, err',
+    'cfg, option',
     [
-        (' ', 'header', '{action} placeholder are required'),
-        (' ', 'footer', '{action} placeholder are required'),
-        ('{scope}', 'header', '{action} placeholder are required'),
-        ('{scope}', 'footer', '{action} placeholder are required'),
-        ('{action}', 'header', '{subject} placeholder are required'),
+        ({'label_pattern': '{action}:{scope}'}, []),
+        ({}, ['--label-pattern={action}:{scope}']),
     ]
 )
+@patch('braulio.cli.commit_analyzer', autospec=True)
 @patch('braulio.cli.Git', autospec=True)
-def test_invalid_label_pattern_option(
-        MockGit, label_pattern, label_position, err):
+def test_label_pattern_option(
+        MockGit, mock_commit_analyzer, cfg, option, isolated_filesystem):
 
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
-        options = [f'--label-pattern={label_pattern}',
-                   f'--label-position={label_position}']
-        print(options)
-        result = runner.invoke(cli, ['release'] + options)
+    with isolated_filesystem:
+        Path('HISTORY.rst').touch()
 
-        assert result.exit_code == 2, result.output
-        assert err in result.output
+        with open('setup.cfg', 'w') as config_file:
+            config_parser = ConfigParser()
+            config_parser['braulio'] = cfg
+            config_parser.write(config_file)
+
+        command = ['release'] + option
+        result = runner.invoke(cli, command)
+
+        assert result.exit_code == 1, result.output
+
+        mock_commit_analyzer.assert_called_with(
+            MockGit().log(),
+            '{action}:{scope}',
+            'footer',
+        )
 
 
 @parametrize(
