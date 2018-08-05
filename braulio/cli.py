@@ -136,15 +136,21 @@ def tag_pattern_option_validator(ctx, param, value):
     return value
 
 
-def current_version_callback(ctx, param, value):
+def current_version_option_validator(ctx, param, value):
+    """If a version string is provided, validates it. Otherwise it tries
+    to determine the current version from the last Git tag that matches
+    ``tag_pattern`` option.
+
+    Return a :class:`~braulio.version.Version` object or **None**.
+    """
+
     current_version = None
 
     if value:
         match = VERSION_STRING_REGEXP.match(value)
 
         if not match:
-            msg(f'{value} is not a valid version string')
-            ctx.abort()
+            ctx.fail(f'{value} is not a valid version string')
 
         params = match.groupdict(default=0)
         current_version = Version(**params)
@@ -236,7 +242,7 @@ def label_pattern_option_validator(ctx, param, value):
               help='Pattern for Git tags that represent versions')
 @click.option('--current-version',
               help='Manually specify the curren version.',
-              callback=current_version_callback)
+              callback=current_version_option_validator)
 @click.option('-y', 'confirm_flag', is_flag=True, default=False,
               help="Don't ask for confirmation")
 @click.argument('files', nargs=-1, type=click.Path(exists=True),

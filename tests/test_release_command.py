@@ -8,7 +8,7 @@ from click.exceptions import UsageError
 from click.testing import CliRunner
 from braulio.git import Tag
 from braulio.version import Version
-from braulio.cli import cli, release, current_version_callback, \
+from braulio.cli import cli, release, current_version_option_validator, \
     label_pattern_option_validator, changelog_file_option_validator, \
     bump_option_validator, tag_pattern_option_validator
 
@@ -529,6 +529,11 @@ def test_tag_pattern_option(
     mock_git.tag.assert_called_with(expected)
 
 
+def test_current_version_option_validator_with_invalid_version_string(ctx):
+    with pytest.raises(UsageError):
+        current_version_option_validator(ctx, {}, 'invalid-version-string')
+
+
 @parametrize(
     'tags, value, expected_version, expected_tag',
     [
@@ -547,41 +552,19 @@ def test_tag_pattern_option(
     ],
 )
 @patch('braulio.cli.Git')
-def test_current_version_callback(
+def test_current_version_option_validator(
         MockGit, tags, value, expected_version, expected_tag):
     mock_git = MockGit()
     mock_git.tags = tags
     ctx = Context(release)
     ctx.params['tag_pattern'] = 'v{version}'
 
-    version = current_version_callback(ctx, {}, value)
+    version = current_version_option_validator(ctx, {}, value)
 
     assert version == expected_version
 
     if expected_tag:
         assert ctx.params['current_tag'] == expected_tag
-
-
-@parametrize(
-    'cfg, options',
-    [
-        ({'current_version': 'invalid'}, []),
-        ({'current_version': 'invalid'}, ['--current-version=invalid']),
-        ({}, ['--current-version=invalid']),
-    ],
-)
-@patch('braulio.cli.Git')
-def test_invalid_current_version_option(
-        MockGit, options, cfg, isolated_filesystem):
-
-    runner = CliRunner()
-
-    with isolated_filesystem('HISTORY.rst', cfg=cfg):
-        command = ['release'] + options + ['-y']
-        result = runner.invoke(cli, command)
-
-        assert result.exit_code == 1
-        assert 'invalid is not a valid version string' in result.output
 
 
 @parametrize(
@@ -594,14 +577,14 @@ def test_invalid_current_version_option(
     ],
 )
 @patch('braulio.cli.Git')
-def test_current_version_cfg_option_update(
+def test_update_current_version_config_file_option(
         MockGit, cfg, options, expected, isolated_filesystem):
 
     mock_git = MockGit()
+    mock_git.tags = [FakeTag(name='v2.0.0')]
     runner = CliRunner()
 
     with isolated_filesystem('HISTORY.rst', cfg=cfg):
-        mock_git.tags = [FakeTag(name='v2.0.0')]
 
         command = ['release', '-y'] + options
         result = runner.invoke(cli, command)
