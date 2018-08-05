@@ -10,7 +10,7 @@ from braulio.git import Tag
 from braulio.version import Version
 from braulio.cli import cli, release, current_version_callback, \
     label_pattern_option_validator, changelog_file_option_validator, \
-    bump_option_validator
+    bump_option_validator, tag_pattern_option_validator
 
 parametrize = pytest.mark.parametrize
 
@@ -511,6 +511,16 @@ def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
     assert mock_git.commit.called is True
 
 
+@parametrize('value', ('v{version}', 'release{version}', '{version}'))
+def test_tag_pattern_option_validator(ctx, value):
+    assert tag_pattern_option_validator(ctx, {}, value) == value
+
+
+def test_tag_pattern_option_validator_with_invalid_value(ctx):
+    with pytest.raises(UsageError):
+        tag_pattern_option_validator(ctx, {}, 'invalid-tag-pattern')
+
+
 @parametrize(
     'options, cfg_value, expected',
     [
@@ -547,33 +557,6 @@ def test_tag_pattern_option(
 
     assert result.exit_code == 0
     mock_git.tag.assert_called_with(expected)
-
-
-@parametrize(
-    'options, cfg_value',
-    [
-        ([], {'tag_pattern': 'version'}),
-        (['--tag-pattern=released'], {}),
-        (['--tag-pattern=version'], {'tag_pattern': 'release'}),
-    ],
-)
-@patch('braulio.cli.Git', autospec=True)
-def test_invalid_tag_pattern_option(MockGit, options, cfg_value):
-    runner = CliRunner()
-
-    with runner.isolated_filesystem():
-        Path('HISTORY.rst').touch()
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg_value
-            config_parser.write(config_file)
-
-        command = ['release'] + options
-        result = runner.invoke(cli, command)
-
-        assert result.exit_code == 1
-        assert 'Missing {version} placeholder in tag_pattern' in result.output
 
 
 @parametrize(

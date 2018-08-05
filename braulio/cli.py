@@ -125,10 +125,14 @@ def changelog_file_option_validator(ctx, param, value):
     return path
 
 
-def tag_pattern_callback(ctx, param, value):
+def tag_pattern_option_validator(ctx, param, value):
+    """The provided string must contain **{version}** placeholder in order to
+    be valid. Otherwise :class:`click.UsageError` is raised.
+    """
+
     if not value or '{version}' not in value:
-        msg('Missing {version} placeholder in tag_pattern.')
-        ctx.abort()
+        ctx.fail('Missing {version} placeholder in tag_pattern.')
+
     return value
 
 
@@ -227,7 +231,7 @@ def label_pattern_option_validator(ctx, param, value):
               callback=label_pattern_option_validator,
               help='Pattern to identify labels in commit messages.')
 @click.option('--tag-pattern',
-              callback=tag_pattern_callback,
+              callback=tag_pattern_option_validator,
               is_eager=True,
               help='Pattern for Git tags that represent versions')
 @click.option('--current-version',
