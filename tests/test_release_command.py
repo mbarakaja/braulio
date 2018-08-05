@@ -427,19 +427,10 @@ def test_label_pattern_option(
 
     runner = CliRunner()
 
-    with isolated_filesystem:
-        Path('HISTORY.rst').touch()
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
+        result = runner.invoke(cli, ['release'] + option)
 
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg
-            config_parser.write(config_file)
-
-        command = ['release'] + option
-        result = runner.invoke(cli, command)
-
-        assert result.exit_code == 1, result.output
-
+        assert result.exit_code == 1
         mock_commit_analyzer.assert_called_with(
             MockGit().log(),
             '{action}:{scope}',
@@ -448,7 +439,7 @@ def test_label_pattern_option(
 
 
 @parametrize(
-    'flag, config, called',
+    'flag, cfg, called',
     [
         ([], {}, True,),
         ([], {'commit': False}, False,),
@@ -457,20 +448,13 @@ def test_label_pattern_option(
     ],
 )
 @patch('braulio.cli.Git', autospec=True)
-def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
+def test_commit_flag(MockGit, flag, cfg, called, isolated_filesystem):
     """Test commit flag picked from CLI or configuration file"""
 
     mock_git = MockGit()
     runner = CliRunner()
 
-    with isolated_filesystem:
-        Path('HISTORY.rst').touch()
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = config
-            config_parser.write(config_file)
-
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
         command = ['release'] + flag + ['-y']
         result = runner.invoke(cli, command)
 
@@ -480,7 +464,7 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
 
 
 @parametrize(
-    'flag, cfg_value, called',
+    'flag, cfg, called',
     [
         ([], {}, True,),
         ([], {'tag': False}, False,),
@@ -489,20 +473,13 @@ def test_commit_flag(MockGit, flag, config, called, isolated_filesystem):
     ],
 )
 @patch('braulio.cli.Git', autospec=True)
-def test_tag_flag(MockGit, flag, cfg_value, called, isolated_filesystem):
+def test_tag_flag(MockGit, flag, cfg, called, isolated_filesystem):
     """Test tag flag picked from CLI or configuration file"""
 
     mock_git = MockGit()
     runner = CliRunner()
 
-    with isolated_filesystem:
-        Path('HISTORY.rst').touch()
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg_value
-            config_parser.write(config_file)
-
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
         command = ['release'] + flag + ['-y']
         result = runner.invoke(cli, command)
 
@@ -522,7 +499,7 @@ def test_tag_pattern_option_validator_with_invalid_value(ctx):
 
 
 @parametrize(
-    'options, cfg_value, expected',
+    'options, cfg, expected',
     [
         ([], {}, 'v0.0.1'),
         ([], {'tag_pattern': 'version{version}'}, 'version0.0.1'),
@@ -537,21 +514,14 @@ def test_tag_pattern_option_validator_with_invalid_value(ctx):
 )
 @patch('braulio.cli.Git', autospec=True)
 def test_tag_pattern_option(
-        MockGit, isolated_filesystem, options, cfg_value, expected):
+        MockGit, isolated_filesystem, options, cfg, expected):
     """Test tag options picked from CLI or configuration file"""
 
     mock_git = MockGit()
     mock_git.tags = []
     runner = CliRunner()
 
-    with isolated_filesystem:
-        Path('HISTORY.rst').touch()
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg_value
-            config_parser.write(config_file)
-
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
         command = ['release'] + options + ['-y']
         result = runner.invoke(cli, command)
 
@@ -593,7 +563,7 @@ def test_current_version_callback(
 
 
 @parametrize(
-    'cfg_value, options',
+    'cfg, options',
     [
         ({'current_version': 'invalid'}, []),
         ({'current_version': 'invalid'}, ['--current-version=invalid']),
@@ -601,17 +571,12 @@ def test_current_version_callback(
     ],
 )
 @patch('braulio.cli.Git')
-def test_invalid_current_version_option(MockGit, options, cfg_value):
+def test_invalid_current_version_option(
+        MockGit, options, cfg, isolated_filesystem):
+
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
-        Path('HISTORY.rst').touch()
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg_value
-            config_parser.write(config_file)
-
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
         command = ['release'] + options + ['-y']
         result = runner.invoke(cli, command)
 
@@ -620,7 +585,7 @@ def test_invalid_current_version_option(MockGit, options, cfg_value):
 
 
 @parametrize(
-    'cfg_value, options, expected',
+    'cfg, options, expected',
     [
         ({'current_version': '2.0.0'}, [], '2.0.1'),
         ({'current_version': '2.0.0'}, ['--current-version=2.0.0'], '2.0.1'),
@@ -630,19 +595,13 @@ def test_invalid_current_version_option(MockGit, options, cfg_value):
 )
 @patch('braulio.cli.Git')
 def test_current_version_cfg_option_update(
-        MockGit, cfg_value, options, expected):
+        MockGit, cfg, options, expected, isolated_filesystem):
+
+    mock_git = MockGit()
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
-        Path('HISTORY.rst').touch()
-
-        mock_git = MockGit()
+    with isolated_filesystem('HISTORY.rst', cfg=cfg):
         mock_git.tags = [FakeTag(name='v2.0.0')]
-
-        with open('setup.cfg', 'w') as config_file:
-            config_parser = ConfigParser()
-            config_parser['braulio'] = cfg_value
-            config_parser.write(config_file)
 
         command = ['release', '-y'] + options
         result = runner.invoke(cli, command)
