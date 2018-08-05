@@ -9,7 +9,8 @@ from click.testing import CliRunner
 from braulio.git import Tag
 from braulio.version import Version
 from braulio.cli import cli, release, current_version_callback, \
-    label_pattern_option_validator, changelog_file_option_validator
+    label_pattern_option_validator, changelog_file_option_validator, \
+    bump_option_validator
 
 parametrize = pytest.mark.parametrize
 
@@ -77,6 +78,23 @@ def test_confirmation_prompt(
         assert mock_update_chglog.called is called
         assert mock_git.commit.called is called
         assert mock_git.tag.called is called
+
+
+@parametrize(
+    'value, expected',
+    [
+        ('6', Version('6.0.0')),
+        ('4.3', Version('4.3.0')),
+        ('3.2.1', Version('3.2.1')),
+    ]
+)
+def test_bump_option_validator(ctx, value, expected):
+    assert bump_option_validator(ctx, {}, value) == expected
+
+
+def test_bump_option_validator_with_invalid_string(ctx):
+    with pytest.raises(UsageError):
+        bump_option_validator(ctx, {}, 'invalid-version-string')
 
 
 @parametrize(

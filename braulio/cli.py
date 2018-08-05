@@ -3,7 +3,7 @@ import click
 from pathlib import Path
 from click import style
 from braulio.git import Git, commit_analyzer
-from braulio.version import Version, validate_version_str, get_next_version, \
+from braulio.version import Version, get_next_version, \
     VERSION_STRING_REGEXP
 from braulio.config import Config, update_config_file
 from braulio.files import find_chglog_file, create_chglog_file, \
@@ -80,11 +80,21 @@ def init(changelog_name):
         update_config_file('changelog_file', changelog_name)
 
 
-def bump_callback(ctx, param, value):
-    if not value or validate_version_str(value):
-        return value
-    click.echo(f'{value} is not a valid version number')
-    ctx.abort()
+def bump_option_validator(ctx, param, value):
+    """In case a value is provided checks that it is a valid version string. If
+    is not thrown :class:`click.UsageError`.
+
+    Return a :class:`~braulio.version.Version` object or **None**.
+    """
+    if value:
+        match = VERSION_STRING_REGEXP.match(value)
+
+        if not match:
+            ctx.fail(f'{x_mark} {value} is not a valid version string')
+
+        return Version(**match.groupdict(default=0))
+
+    return value
 
 
 def files_callback(ctx, param, value):
@@ -199,7 +209,7 @@ def label_pattern_option_validator(ctx, param, value):
               help='Minor version bump.')
 @click.option('--patch', 'bump_type', flag_value='patch',
               help='Patch version bump.')
-@click.option('--bump', callback=bump_callback, is_eager=True,
+@click.option('--bump', callback=bump_option_validator, is_eager=True,
               help='Bump to a given version arbitrarily.')
 @click.option('--commit/--no-commit', 'commit_flag', default=True,
               help='Enable/disable release commit')
@@ -255,13 +265,13 @@ def release(ctx, bump, bump_type, commit_flag, tag_flag, confirm_flag,
     release_data = ReleaseDataTree(semantic_commits)
 
     # --bump must have precedence over any of --major, --minor or --patch
-    bump_version_to = bump or bump_type
+    bump_version_to = bump.string if bump else bump_type
 
     # Any manual bump must have precedence over bump part determined from
     # commit messages
     bump_version_to = bump_version_to or release_data.bump_version_to
 
-    # If there is no tag in the repository, assume version 0.0.0
+    # If there isn't a current version, assume version 0.0.0
     current_version = current_version or Version()
 
     new_version = get_next_version(bump_version_to, current_version)
