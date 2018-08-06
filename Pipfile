@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+Click = ">=6.7"
+
+[dev-packages]
+coverage = ">=4.5.1"
+tox = "*"
+pytest = ">=3.7.1"
+pytest-runner = "==4.2"
+sphinx = ">=1.7.6"
+twine = ">=1.11.0"
+"flake8" = ">=3.5.0"
+watchdog = "*"
+black = "*"
+
+[requires]
+python_version = "3.6"
+
+[pipenv]
+allow_prereleases = true
