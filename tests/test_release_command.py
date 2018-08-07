@@ -73,8 +73,7 @@ def test_confirmation_prompt(MockGit, mock_update_chglog, _input, isolated_files
     with isolated_filesystem("HISTORY.rst"):
         result = runner.invoke(cli, ["release"], input=_input)
 
-        exit_code = 0 if _input == "y" else 1
-        assert result.exit_code == exit_code, result.output
+        assert result.exit_code == 0
         assert " › Continue? [y/N]" in result.output
 
         mock_git = MockGit()
@@ -331,7 +330,7 @@ def test_output_after_confirmation_prompt(
     with isolated_filesystem("HISTORY.rst"):
         result = runner.invoke(cli, ["release"] + options)
 
-        assert result.exit_code == 1, result.output
+        assert result.exit_code == 0, result.output
         assert " › Current version  : 0.2.0" in result.output
         assert f" › Commits found    : {len(commit_list)}" in result.output
         assert " › New version      :" in result.output
@@ -406,7 +405,7 @@ def test_label_pattern_option(
     with isolated_filesystem("HISTORY.rst", cfg=cfg):
         result = runner.invoke(cli, ["release"] + option)
 
-        assert result.exit_code == 1
+        assert result.exit_code == 0
         mock_commit_analyzer.assert_called_with(
             MockGit().log(), "{action}:{scope}", "footer"
         )

@@ -374,6 +374,3 @@ def release(
             update_config_file("current_version", new_version.string)
 
         msg(f"Version {new_version} released successfully", suffix=" 🎉")
-
-        return
-    ctx.abort()
