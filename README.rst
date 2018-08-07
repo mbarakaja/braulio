@@ -30,7 +30,7 @@ are available through the CLI tool also.
 
 ``label_position =``
   The posible values are **header** or **footer** (default). This option tell to
-  Braulio where to look for metatada information. 
+  Braulio where to look for metatada information.
 
 ``label_pattern =``
   This is not a regular expression, but instead is a pattern using placeholders,
@@ -72,7 +72,7 @@ The commit matches the message convention and the extracted information is:
     }
 
 If the label is located in the footer, ``{subject}`` must be ommited since the
-entire header will be used as the subject value. 
+entire header will be used as the subject value.
 
 
 Custom Git tag names
@@ -98,6 +98,21 @@ version is released, the same pattern will be used as template to generate the
 new Git tag name. The new version string will fill the ``{version}`` placeholder.
 
 
+Custom release commit message
+-----------------------------
+If the release commit is enabled, this is used for the message.
+
++---------------+-------------+-------------------------------+
+| CLI           | Config File | Default                       |
++===============+=============+===============================+
+| ``--message`` | message     | Release version {new_version} |
++---------------+-------------+-------------------------------+
+
+This is a template string containing replacement fields. The available fields
+are **{new_version**} and **{current_version}**. ``{new_version}`` is always
+mandatory, while ``{current_version}``
+
+
 Installing
 ----------
 
@@ -105,7 +120,7 @@ Install and update using pip:
 
 .. code-block:: bash
 
-    pip install -U braulio
+    $ pip install -U braulio
 
 
 Usage
@@ -113,7 +128,7 @@ Usage
 
 .. code-block:: bash
 
-    brau --help
+    $ brau --help
 
 
 

@@ -48,6 +48,7 @@ def cli(ctx):
             "tag_pattern": config.tag_pattern,
             "current_version": config.current_version,
             "changelog_file": config.changelog_file,
+            "message": config.message,
         }
     }
 
@@ -128,6 +129,15 @@ def changelog_file_option_validator(ctx, param, value):
         )
 
     return path
+
+
+def message_option_validator(ctx, param, value):
+    """A commit template must have the **{new_version}** placeholder."""
+
+    if not value or "{new_version}" not in value:
+        ctx.fail("Missing {new_version} placeholder in " f"{value}.")
+
+    return value
 
 
 def tag_pattern_option_validator(ctx, param, value):
@@ -234,6 +244,9 @@ def label_pattern_option_validator(ctx, param, value):
     help="Enable/disable release commit",
 )
 @click.option(
+    "--message", callback=message_option_validator, help="Customizes commit message."
+)
+@click.option(
     "--tag/--no-tag", "tag_flag", default=True, help="Enable/disable version tagging."
 )
 @click.option(
@@ -277,6 +290,7 @@ def release(
     bump,
     bump_type,
     commit_flag,
+    message,
     tag_flag,
     confirm_flag,
     changelog_file,
@@ -357,7 +371,12 @@ def release(
             ctx.abort()
 
         if commit_flag:
-            commit_message = f"Release version {new_version.string}"
+            message_args = {"new_version": new_version.string}
+
+            if "{current_version}" in message:
+                message_args["current_version"] = current_version.string
+
+            commit_message = message.format(**message_args)
 
             msg(f"Add commit: {commit_message}", nl=False)
 

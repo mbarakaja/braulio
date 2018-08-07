@@ -1,7 +1,7 @@
 import pytest
 from collections import namedtuple
 from configparser import ConfigParser
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 from pathlib import Path
 from click import Context
 from click.exceptions import UsageError
@@ -16,6 +16,7 @@ from braulio.cli import (
     changelog_file_option_validator,
     bump_option_validator,
     tag_pattern_option_validator,
+    message_option_validator,
 )
 
 parametrize = pytest.mark.parametrize
@@ -459,6 +460,49 @@ def test_tag_flag(MockGit, flag, cfg, called, isolated_filesystem):
     assert result.exit_code == 0
     assert mock_git.tag.called is called
     assert mock_git.commit.called is True
+
+
+@parametrize(
+    "value",
+    (
+        "Bump to {new_version}",
+        "Bump from {current_version} to {new_version}",
+        "{new_version}",
+    ),
+)
+def test_message_option_validator(ctx, value):
+    rv = message_option_validator(ctx, {}, value)
+    assert rv == value
+
+
+@parametrize("value", (None, "message"))
+def test_message_option_validator_with_invalid_value(ctx, value):
+    with pytest.raises(UsageError):
+        message_option_validator(ctx, {}, "message")
+
+
+@parametrize(
+    "cfg, option, expected",
+    [
+        ({}, [], "Release version 8.0.1"),
+        ({"message": "Bump {new_version}"}, [], "Bump 8.0.1"),
+        ({}, ["--message=Bump {new_version}"], "Bump 8.0.1"),
+        ({"message": "{current_version} => {new_version}"}, [], "8.0.0 => 8.0.1"),
+    ],
+)
+@patch("braulio.cli.Git")
+def test_message_option(MockGit, isolated_filesystem, cfg, option, expected):
+    mock_git = MockGit()
+    mock_git.tags = [FakeTag(name="v8.0.0")]
+    runner = CliRunner()
+
+    with isolated_filesystem("HISTORY.rst", cfg=cfg):
+        command = ["release", "-y"] + option
+        result = runner.invoke(cli, command)
+
+        assert result.exit_code == 0
+
+        mock_git.commit.assert_called_with(expected, files=ANY)
 
 
 @parametrize("value", ("v{version}", "release{version}", "{version}"))

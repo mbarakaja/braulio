@@ -9,6 +9,7 @@ DEFAULT_CONFIG.read_dict(
     {
         "braulio": {
             "commit": "True",
+            "message": "Release version {new_version}",
             "tag": "True",
             "confirm": "False",
             "changelog_file": DEFAULT_CHANGELOG,
@@ -31,6 +32,7 @@ class Config:
 
         self.config_parser = cfg
         self._commit = cfg.getboolean("braulio", "commit")
+        self._message = cfg.get("braulio", "message")
         self._tag = cfg.getboolean("braulio", "tag")
         self._confirm = cfg.getboolean("braulio", "confirm")
         self._changelog_file = Path(cfg.get("braulio", "changelog_file").strip())
@@ -71,6 +73,10 @@ class Config:
     @property
     def commit(self):
         return self._commit
+
+    @property
+    def message(self):
+        return self._message
 
     @property
     def tag(self):

@@ -12,6 +12,7 @@ class TestConfig:
     def check_default_options(self, config):
         assert config.tag is True
         assert config.commit is True
+        assert config.message == "Release version {new_version}"
         assert config.confirm is False
         assert config.files == ()
         assert config.changelog_file == Path("HISTORY.rst")
@@ -131,6 +132,14 @@ class TestConfig:
 
             config = Config()
             config.current_version == "4.9.3"
+
+    def test_message_option(self, isolated_filesystem):
+        with isolated_filesystem:
+            file_path = Path.cwd() / "setup.cfg"
+            file_path.write_text("[braulio]\n" "message = Release: {new_version}\n")
+
+            config = Config()
+            config.current_version == "Release: {new_version}"
 
 
 class TestUpdateConfigFile:
