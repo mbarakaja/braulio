@@ -146,6 +146,21 @@ def test_manual_version_bump(
         mock_git.tag.assert_called_with(f"v{expected}")
 
 
+@patch("braulio.cli.Git", autospec=True)
+def test_bump_to_a_lower_version(MockGit, isolated_filesystem):
+
+    mock_git = MockGit()
+    mock_git.tags = [FakeTag("v2.0.0")]
+    runner = CliRunner()
+
+    with isolated_filesystem("HISTORY.rst"):
+        result = runner.invoke(cli, ["release", "--bump=1", "-y"])
+
+    assert result.exit_code == 1
+    assert "The release of a lower versions is not supported for now" in result.output
+    assert "Aborted" in result.output
+
+
 @parametrize(
     "hash_lst, tags, expected",
     [
@@ -611,5 +626,3 @@ def test_update_current_version_config_file_option(
 
         cfg = ConfigParser()
         cfg.read("setup.cfg")
-
-        assert cfg.get("braulio", "current_version", fallback=None) == expected

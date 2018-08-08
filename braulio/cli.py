@@ -92,6 +92,7 @@ def bump_option_validator(ctx, param, value):
 
     Return a :class:`~braulio.version.Version` object or **None**.
     """
+
     if value:
         match = VERSION_STRING_REGEXP.match(value)
 
@@ -234,7 +235,6 @@ def label_pattern_option_validator(ctx, param, value):
 @click.option(
     "--bump",
     callback=bump_option_validator,
-    is_eager=True,
     help="Bump to a given version arbitrarily.",
 )
 @click.option(
@@ -334,6 +334,11 @@ def release(
     current_version = current_version or Version()
 
     new_version = get_next_version(bump_version_to, current_version)
+
+    if not new_version:
+        msg("The release of a lower versions is not supported for now.")
+        ctx.abort()
+
     new_tag_name = tag_pattern.format(version=new_version.string)
 
     msg(f'{label("New version")} {new_version}')
