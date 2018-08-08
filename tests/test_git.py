@@ -26,19 +26,28 @@ class TestRunCommand:
                 _run_command(["git", "status"])
 
 
-@parametrize(
-    "text, date, name",
-    [
-        ("2015-10-15  v10.0.1", "2015-10-15", "v10.0.1"),
-        ("2016-02-26   v0.10.13", "2016-02-26", "v0.10.13"),
-        ("2016-07-06   save-point", "2016-07-06", "save-point"),
-    ],
-)
-def test_tag_class(text, date, name):
-    tag = Tag(text)
+class TestTag:
+    @parametrize(
+        "text, date, name",
+        [
+            ("2015-10-15  v10.0.1", "2015-10-15", "v10.0.1"),
+            ("2016-02-26   v0.10.13", "2016-02-26", "v0.10.13"),
+            ("2016-07-06   save-point", "2016-07-06", "save-point"),
+        ],
+    )
+    def test_parse_name_and_date_string(self, text, date, name):
+        tag = Tag(text)
 
-    assert tag.name == name
-    assert tag.date == date
+        assert tag.name == name
+        assert tag.date == date
+
+    def test_str(self):
+        tag = Tag("2015-10-15  v10.0.1")
+        assert str(tag) == "v10.0.1"
+
+    def test_repr(self):
+        tag = Tag("2015-10-15  v10.0.1")
+        assert repr(tag) == 'Tag("2015-10-15  v10.0.1")'
 
 
 class TestCommitClass:

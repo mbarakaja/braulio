@@ -23,14 +23,15 @@ def _run_git_tag_command():
 
 class Tag:
     def __init__(self, text):
+        self.text = text
         self.date = text[:10]
         self.name = text[10:].strip()
 
     def __str__(self):
-        return f"Tag({self.version})"
+        return self.name
 
     def __repr__(self):
-        return f"Tag({self.version})"
+        return f'Tag("{self.text}")'
 
 
 class Commit:
