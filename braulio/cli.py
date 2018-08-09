@@ -32,6 +32,7 @@ def label(text):
 
 
 @click.group()
+@click.version_option(prog_name="Braulio")
 @click.pass_context
 def cli(ctx):
 
