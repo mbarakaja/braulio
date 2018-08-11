@@ -131,7 +131,7 @@ class TestConfig:
             file_path.write_text("[braulio]\n" "current_version = 4.9.3\n")
 
             config = Config()
-            config.current_version == "4.9.3"
+            assert config.current_version == "4.9.3"
 
     def test_message_option(self, isolated_filesystem):
         with isolated_filesystem:
@@ -139,7 +139,7 @@ class TestConfig:
             file_path.write_text("[braulio]\n" "message = Release: {new_version}\n")
 
             config = Config()
-            config.current_version == "Release: {new_version}"
+            assert config.message == "Release: {new_version}"
 
 
 class TestUpdateConfigFile:
