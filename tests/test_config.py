@@ -1,5 +1,6 @@
 import pytest
 from configparser import ConfigParser
+from collections import OrderedDict
 from pathlib import Path
 from click.testing import CliRunner
 from braulio.config import Config, update_config_file
@@ -20,6 +21,7 @@ class TestConfig:
         assert config.label_pattern == "!{action}:{scope}"
         assert config.tag_pattern == "v{version}"
         assert config.current_version is None
+        assert config.stages == {"final": "{major}.{minor}.{patch}"}
 
     def test_default_options(self, isolated_filesystem):
 
@@ -140,6 +142,27 @@ class TestConfig:
 
             config = Config()
             assert config.message == "Release: {new_version}"
+
+    @pytest.mark.wip
+    def test_stages_option(self, isolated_filesystem):
+        with isolated_filesystem:
+            file_path = Path.cwd() / "setup.cfg"
+            file_path.write_text(
+                "[braulio.stages]\n"
+                "dev   = {major}.{minor}.{patch}.dev{n}\n"
+                "beta  = {major}.{minor}.{patch}b{n}\n"
+                "final = {major}.{minor}.{patch}\n"
+            )
+
+            config = Config()
+            assert type(config.stages) == OrderedDict
+            assert config.stages == OrderedDict(
+                {
+                    "dev": "{major}.{minor}.{patch}.dev{n}",
+                    "beta": "{major}.{minor}.{patch}b{n}",
+                    "final": "{major}.{minor}.{patch}",
+                }
+            )
 
 
 class TestUpdateConfigFile:

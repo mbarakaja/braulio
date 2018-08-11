@@ -1,5 +1,6 @@
 import click
 from pathlib import Path
+from collections import OrderedDict
 from configparser import ConfigParser
 from braulio.files import DEFAULT_CHANGELOG
 
@@ -17,7 +18,8 @@ DEFAULT_CONFIG.read_dict(
             "label_pattern": "!{action}:{scope}",
             "label_position": "footer",
             "tag_pattern": "v{version}",
-        }
+        },
+        "braulio.stages": {"final": "{major}.{minor}.{patch}"},
     }
 )
 
@@ -41,6 +43,9 @@ class Config:
         self._tag_pattern = cfg.get("braulio", "tag_pattern").strip()
         self._current_version = cfg.get("braulio", "current_version", fallback=None)
 
+        self._stages = OrderedDict(cfg["braulio.stages"])
+
+        # files
         files_value = cfg.get("braulio", "files").strip()
 
         if files_value == "":
@@ -56,19 +61,26 @@ class Config:
 
     def _load_config_file(self):
         path = Path.cwd() / "setup.cfg"
-        setup_cfg = ConfigParser()
+        user_config = ConfigParser()
 
         if path.exists() and path.is_file():
-            setup_cfg.read(path)
+            user_config.read(path)
 
-            if setup_cfg.has_section("braulio"):
-                self.cfg_file_options = dict(setup_cfg.items("braulio"))
+            if user_config.has_section("braulio"):
+                self.cfg_file_options = OrderedDict(user_config.items("braulio"))
 
-        cfg = ConfigParser()
-        cfg.read_dict(DEFAULT_CONFIG)
-        cfg.read_dict(setup_cfg)
+        merged_config = ConfigParser()
+        merged_config.read_dict(DEFAULT_CONFIG)
 
-        return cfg
+        # Since ConfigParser uses OrderedDict, we need to remove
+        # [braulio.stages] default section before merge the user defined
+        # section to preserve the order of the options.
+        if user_config.has_section("braulio.stages"):
+            merged_config.remove_section("braulio.stages")
+
+        merged_config.read_dict(user_config)
+
+        return merged_config
 
     @property
     def commit(self):
@@ -109,6 +121,10 @@ class Config:
     @property
     def current_version(self):
         return self._current_version
+
+    @property
+    def stages(self):
+        return self._stages
 
 
 def update_config_file(option, value):

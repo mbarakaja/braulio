@@ -206,6 +206,30 @@ def test_determine_next_version_from_commit_messages(
         mock_git.tag.assert_called_with(f"v{expected}")
 
 
+@patch("braulio.cli.Git", autospec=True)
+def test_release_from_pre_release_stage(MockGit, commit_list, isolated_filesystem):
+    runner = CliRunner()
+    mock_git = MockGit()
+    mock_git.tags = [FakeTag("v1.3.1beta5")]
+    mock_git.log.return_value = commit_list
+
+    with isolated_filesystem("HISTORY.rst"):
+        # Add first pre-release stages to config file
+        cfg = Path("setup.cfg")
+        cfg.touch()
+        cfg.write_text(
+            "[braulio.stages]\n"
+            "dev   = {major}.{minor}.{patch}.dev{n}\n"
+            "beta  = {major}.{minor}.{patch}beta{n}\n"
+            "final = {major}.{minor}.{patch}\n"
+        )
+
+        result = runner.invoke(cli, ["release"])
+
+        assert result.exit_code == 0, result.output
+        assert "New version      : 1.3.1" in result.output
+
+
 @patch("braulio.cli.ReleaseDataTree")
 @patch("braulio.cli.commit_analyzer")
 @patch("braulio.cli.update_chglog", autospec=True)
@@ -239,7 +263,7 @@ def test_call_to_update_changelog(
         release_data = MockReleaseDataTree()
 
         mock_get_next_version.assert_called_with(
-            release_data.bump_version_to, Version()
+            Version(), release_data.bump_version_to
         )
 
         mock_update_chglog.assert_called_with(

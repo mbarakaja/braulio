@@ -3,7 +3,7 @@ import click
 from pathlib import Path
 from click import style
 from braulio.git import Git, commit_analyzer
-from braulio.version import Version, get_next_version, VERSION_STRING_REGEXP
+from braulio.version import Version, get_next_version, VERSION_STRING_PATTERN
 from braulio.config import Config, update_config_file
 from braulio.files import (
     find_chglog_file,
@@ -38,6 +38,11 @@ def cli(ctx):
 
     config = Config()
     ctx.obj = config
+
+    try:
+        Version.set_stages(config.stages.values())
+    except ValueError as e:
+        ctx.fail(e)
 
     ctx.default_map = {
         "release": {
@@ -95,12 +100,10 @@ def bump_option_validator(ctx, param, value):
     """
 
     if value:
-        match = VERSION_STRING_REGEXP.match(value)
-
-        if not match:
+        try:
+            value = Version(value)
+        except ValueError:
             ctx.fail(f"{x_mark} {value} is not a valid version string")
-
-        return Version(**match.groupdict(default=0))
 
     return value
 
@@ -164,35 +167,33 @@ def current_version_option_validator(ctx, param, value):
     current_version = None
 
     if value:
-        match = VERSION_STRING_REGEXP.match(value)
-
-        if not match:
+        try:
+            current_version = Version(value)
+        except ValueError:
             ctx.fail(f"{value} is not a valid version string")
-
-        params = match.groupdict(default=0)
-        current_version = Version(**params)
 
     # Look for the last git tag for the curren version
     git = Git()
     tag_pattern = ctx.params["tag_pattern"]
 
     if current_version:
-        tag_name_pattern = re.escape(tag_pattern.format(version=current_version.string))
+        tag_pattern = re.escape(tag_pattern.format(version=current_version.string))
     else:
-        tag_name_pattern = re.escape(tag_pattern).replace(
-            r"\{version\}", VERSION_STRING_REGEXP.pattern
+        tag_pattern = re.escape(tag_pattern).replace(
+            r"\{version\}", VERSION_STRING_PATTERN
         )
 
-    tag_regex = re.compile(tag_name_pattern)
+    tag_regex = re.compile(tag_pattern)
 
     for tag in git.tags:
-        tag_version_match = tag_regex.match(tag.name)
+        match = tag_regex.match(tag.name)
 
-        if tag_version_match:
+        if match:
             ctx.params["current_tag"] = tag
 
             if not current_version:
-                current_version = Version(**tag_version_match.groupdict())
+                current_version = Version(**match.groupdict(default=0))
+
             break
 
     return current_version
@@ -334,7 +335,10 @@ def release(
     # If there isn't a current version, assume version 0.0.0
     current_version = current_version or Version()
 
-    new_version = get_next_version(bump_version_to, current_version)
+    if current_version.stage != "final" and not bump:
+        new_version = current_version.bump("final")
+    else:
+        new_version = get_next_version(current_version, bump_version_to)
 
     if not new_version:
         msg("The release of a lower versions is not supported for now.")
