@@ -40,7 +40,7 @@ def cli(ctx):
     ctx.obj = config
 
     try:
-        Version.set_stages(config.stages.values())
+        Version.set_stages(config.stages.items())
     except ValueError as e:
         ctx.fail(e)
 
@@ -230,6 +230,17 @@ def label_pattern_option_validator(ctx, param, value):
     return value
 
 
+def stage_option_validator(ctx, param, value):
+    if value:
+        for key, stage in Version.stages.items():
+            if key == value or stage.label == value:
+                return key
+
+        ctx.fail(f"Unknown pre-release stage {value}")
+
+    return value
+
+
 @cli.command()
 @click.option("--major", "bump_type", flag_value="major", help="Major version bump.")
 @click.option("--minor", "bump_type", flag_value="minor", help="Minor version bump.")
@@ -280,6 +291,7 @@ def label_pattern_option_validator(ctx, param, value):
     help="Manually specify the curren version.",
     callback=current_version_option_validator,
 )
+@click.option("--stage", callback=stage_option_validator, help="User-defined stage")
 @click.option(
     "-y", "confirm_flag", is_flag=True, default=False, help="Don't ask for confirmation"
 )
@@ -301,6 +313,7 @@ def release(
     label_position,
     tag_pattern,
     current_version,
+    stage,
     current_tag=None,
 ):
 
@@ -325,20 +338,25 @@ def release(
 
     release_data = ReleaseDataTree(semantic_commits)
 
-    # --bump must have precedence over any of --major, --minor or --patch
-    bump_version_to = bump.string if bump else bump_type
-
-    # Any manual bump must have precedence over bump part determined from
-    # commit messages
-    bump_version_to = bump_version_to or release_data.bump_version_to
+    bump_version_to = None
 
     # If there isn't a current version, assume version 0.0.0
     current_version = current_version or Version()
 
-    if current_version.stage != "final" and not bump:
-        new_version = current_version.bump("final")
-    else:
-        new_version = get_next_version(current_version, bump_version_to)
+    # --bump, --major, --minor, --patch or commit message based version
+    # are taken into account only if the current version is in final stage.
+    if current_version.stage == "final":
+
+        # --bump have precedence over any of --major, --minor or --patch
+        bump_version_to = bump.string if bump else bump_type
+
+        # Any manual bump have precedence over commit message based versions.
+        bump_version_to = bump_version_to or release_data.bump_version_to
+
+    try:
+        new_version = get_next_version(current_version, bump_version_to, stage)
+    except ValueError as e:
+        ctx.fail(e)
 
     if not new_version:
         msg("The release of a lower versions is not supported for now.")

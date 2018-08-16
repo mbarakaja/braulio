@@ -1,5 +1,5 @@
 import pytest
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from configparser import ConfigParser
 from unittest.mock import patch, ANY
 from pathlib import Path
@@ -7,7 +7,7 @@ from click import Context
 from click.exceptions import UsageError
 from click.testing import CliRunner
 from braulio.git import Tag
-from braulio.version import Version
+from braulio.version import Version, Stage
 from braulio.cli import (
     cli,
     release,
@@ -17,6 +17,7 @@ from braulio.cli import (
     bump_option_validator,
     tag_pattern_option_validator,
     message_option_validator,
+    stage_option_validator,
 )
 
 parametrize = pytest.mark.parametrize
@@ -263,7 +264,7 @@ def test_call_to_update_changelog(
         release_data = MockReleaseDataTree()
 
         mock_get_next_version.assert_called_with(
-            Version(), release_data.bump_version_to
+            Version(), release_data.bump_version_to, None
         )
 
         mock_update_chglog.assert_called_with(
@@ -650,3 +651,29 @@ def test_update_current_version_config_file_option(
 
         cfg = ConfigParser()
         cfg.read("setup.cfg")
+
+
+@pytest.mark.wip
+@parametrize("value, expected", [("dev", "dev"), ("beta", "b"), ("b", "b")])
+def test_stage_option_validator(ctx, value, expected):
+    stages = OrderedDict(
+        dev=Stage("dev", "{major}.{minor}.{patch}.dev{n}"),
+        b=Stage("beta", "{major}.{minor}.{patch}b{n}"),
+        final=Stage("final", "{major}.{minor}.{patch}"),
+    )
+
+    with patch.object(Version, "stages", stages):
+        assert stage_option_validator(ctx, {}, value) == expected
+
+
+@pytest.mark.wip
+def test_stage_option_validator_with_invalid_value(ctx):
+    stages = OrderedDict(
+        dev=Stage("dev", "{major}.{minor}.{patch}.dev{n}"),
+        b=Stage("beta", "{major}.{minor}.{patch}b{n}"),
+        final=Stage("final", "{major}.{minor}.{patch}"),
+    )
+
+    with patch.object(Version, "stages", stages):
+        with pytest.raises(UsageError):
+            assert stage_option_validator(ctx, {}, "unknown")

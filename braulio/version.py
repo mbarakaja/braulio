@@ -1,5 +1,5 @@
 import re
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from string import Formatter
 
 
@@ -40,9 +40,12 @@ stage_pattern = re.compile(
 )
 
 
+Stage = namedtuple("Stage", ["label", "serializer"])
+
+
 class Version:
 
-    _stages = {"final": "{major}.{minor}.{patch}"}
+    stages = {"final": Stage("final", "{major}.{minor}.{patch}")}
 
     def __init__(self, string=None, major=0, minor=0, patch=0, stage=None, n=0):
 
@@ -55,10 +58,11 @@ class Version:
             major, minor, patch, stage, n = parts.values()
 
         stage = stage or "final"
+        n = 0 if stage == "final" else n
 
         try:
-            self.serializer = self._stages[stage]
-            index = tuple(self._stages).index(stage)
+            self.serializer = self.stages[stage].serializer
+            index = tuple(self.stages).index(stage)
         except KeyError:
             raise ValueError(f"{stage} is an unknown stage")
 
@@ -83,19 +87,19 @@ class Version:
         self._stage_number = index
 
     @classmethod
-    def set_stages(cls, serializers):
+    def set_stages(cls, stages):
         _stages = OrderedDict()
 
-        for serializer in serializers:
+        for label, serializer in stages:
             match = stage_pattern.match(serializer)
 
             if not match:
                 raise ValueError(f"{serializer} is an invalid serializer")
 
             key = match.groupdict(default="final")["stage"]
-            _stages[key] = serializer
+            _stages[key] = Stage(label, serializer)
 
-        cls._stages = _stages
+        cls.stages = _stages
 
     def bump(self, bump_part):
         """Return a new bumped version instance."""
@@ -105,7 +109,7 @@ class Version:
         # stage bump
         if bump_part not in {"major", "minor", "patch"}:
 
-            if bump_part not in self._stages:
+            if bump_part not in self.stages:
                 raise ValueError(f"Unknown {bump_part} stage")
 
             # We can not bump from final stage to final again.
@@ -116,7 +120,7 @@ class Version:
             if bump_part == self.stage:
                 n += 1
             else:
-                new_stage_number = tuple(self._stages).index(bump_part)
+                new_stage_number = tuple(self.stages).index(bump_part)
 
                 # We can not bump to a previous stage
                 if new_stage_number < self._stage_number:
@@ -186,19 +190,24 @@ class Version:
         return f"Version('{self.string}')"
 
 
-def get_next_version(current_version, bump_version_to):
+def get_next_version(current, bump_to=None, stage=None):
 
-    if bump_version_to not in {"major", "minor", "patch"}:
-        new_version = Version(bump_version_to)
+    if current.stage != "final":
+        stage = stage or "final"
+        return current.bump(stage)
 
-        if current_version and new_version <= current_version:
-            return None
+    if bump_to:
+        parts = {"major", "minor", "patch"}
+        _version = current.bump(bump_to) if bump_to in parts else Version(bump_to)
+    else:
+        _version = current
 
-        return new_version
+    if stage:
+        args = list(_version)
+        args[-2] = stage
+        _version = Version(None, *args)
 
-    new_version = Version()
+    if _version <= current:
+        return None
 
-    if current_version:
-        new_version = Version(current_version.string)
-
-    return new_version.bump(bump_version_to)
+    return _version

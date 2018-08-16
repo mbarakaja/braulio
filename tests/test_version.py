@@ -6,10 +6,20 @@ from braulio.version import (
     Version,
     get_next_version,
     parse_version_string_parts,
+    Stage,
 )
 
 
 parametrize = pytest.mark.parametrize
+
+
+@pytest.fixture
+def stages():
+    return OrderedDict(
+        dev=Stage("dev", "{major}.{minor}.{patch}.dev{n}"),
+        beta=Stage("beta", "{major}.{minor}.{patch}beta{n}"),
+        final=Stage("final", "{major}.{minor}.{patch}"),
+    )
 
 
 version_strings = [
@@ -78,13 +88,13 @@ class TestVersion:
         ],
     )
     def test_deserializing(self, string, minor, major, patch, stage, n):
-        stages = {
-            "dev": "{major}.{minor}.{patch}dev{n}",
-            "a": "{major}.{minor}.{patch}a{n}",
-            "final": "{major}.{minor}.{patch}",
-        }
+        stages = OrderedDict(
+            dev=Stage("dev", "{major}.{minor}.{patch}dev{n}"),
+            a=Stage("alpha", "{major}.{minor}.{patch}a{n}"),
+            final=Stage("final", "{major}.{minor}.{patch}"),
+        )
 
-        with mock_patch.object(Version, "_stages", stages):
+        with mock_patch.object(Version, "stages", stages):
             version = Version(string)
 
             assert version.major == major
@@ -105,21 +115,12 @@ class TestVersion:
         "major, minor, patch, stage, n, expected",
         [
             (1, 2, 3, None, 0, "1.2.3"),
-            (1, 0, 0, None, 0, "1.0.0"),
-            (2, 1, 0, "alpha", 2, "2.1.0alpha2"),
+            (2, 1, 0, "dev", 2, "2.1.0.dev2"),
             (2, 1, 0, "beta", 1, "2.1.0beta1"),
-            (8, 0, 0, "gamma", 4, "8.0.0gamma4"),
         ],
     )
-    def test_custom_serializers(self, major, minor, patch, stage, n, expected):
-        stages = OrderedDict(
-            alpha="{major}.{minor}.{patch}alpha{n}",
-            beta="{major}.{minor}.{patch}beta{n}",
-            gamma="{major}.{minor}.{patch}gamma{n}",
-            final="{major}.{minor}.{patch}",
-        )
-
-        with mock_patch.object(Version, "_stages", stages):
+    def test_custom_serializers(self, major, minor, patch, stage, n, expected, stages):
+        with mock_patch.object(Version, "stages", stages):
             version = Version(major=major, minor=minor, patch=patch, stage=stage, n=n)
 
             assert version.string == expected
@@ -130,29 +131,23 @@ class TestVersion:
         with pytest.raises(ValueError, match=error):
             Version("2.0.7gama0")
 
-    def test_set_stages(self):
-        stages = [
-            "{major}.{minor}.{patch}a{n}",
-            "{major}.{minor}.{patch}beta{n}",
-            "{major}.{minor}.{patch}gamma{n}",
-            "{major}.{minor}.{patch}",
+    def test_set_stages(self, stages):
+        _stages = [
+            ("dev", "{major}.{minor}.{patch}.dev{n}"),
+            ("beta", "{major}.{minor}.{patch}beta{n}"),
+            ("final", "{major}.{minor}.{patch}"),
         ]
 
-        Version.set_stages(stages)
+        with mock_patch.object(Version, "stages", {}):
+            Version.set_stages(_stages)
 
-        assert Version._stages == OrderedDict(
-            a="{major}.{minor}.{patch}a{n}",
-            beta="{major}.{minor}.{patch}beta{n}",
-            gamma="{major}.{minor}.{patch}gamma{n}",
-            final="{major}.{minor}.{patch}",
-        )
+            assert Version.stages == stages
 
     def test_set_stages_with_invalid_serializer(self):
         stages = [
-            "{major}.{minor}.{patch}a{n}",
-            "{major}.{patch}beta{n}",
-            "{major}.{minor}.{patch}gamma{n}",
-            "{major}.{minor}.{patch}",
+            ("alpha", "{major}.{minor}.{patch}a{n}"),
+            ("beta", "{major}.{patch}beta{n}"),
+            ("final", "{major}.{minor}.{patch}"),
         ]
 
         message = "{major}.{patch}beta{n} is an invalid serializer"
@@ -181,14 +176,8 @@ class TestVersion:
             "from first stage to final stage",
         ],
     )
-    def test_bump(self, current, bump_part, expected):
-        stages = OrderedDict(
-            dev="{major}.{minor}.{patch}.dev{n}",
-            beta="{major}.{minor}.{patch}beta{n}",
-            final="{major}.{minor}.{patch}",
-        )
-
-        with mock_patch.object(Version, "_stages", stages):
+    def test_bump(self, current, bump_part, expected, stages):
+        with mock_patch.object(Version, "stages", stages):
             version = Version(current)
             new_version = version.bump(bump_part)
 
@@ -215,14 +204,8 @@ class TestVersion:
             "unknown stage",
         ],
     )
-    def test_invalid_bump(self, current, bump_part, message):
-        stages = OrderedDict(
-            dev="{major}.{minor}.{patch}.dev{n}",
-            beta="{major}.{minor}.{patch}beta{n}",
-            final="{major}.{minor}.{patch}",
-        )
-
-        with mock_patch.object(Version, "_stages", stages):
+    def test_invalid_bump(self, current, bump_part, message, stages):
+        with mock_patch.object(Version, "stages", stages):
             with pytest.raises(ValueError, match=message):
                 version = Version(current)
                 version.bump(bump_part)
@@ -306,14 +289,8 @@ version_strings_to_compare = (
 
 
 @parametrize("left, right, is_less, is_greater, is_equal", version_strings_to_compare)
-def test_comparison_operators(left, right, is_less, is_greater, is_equal):
-    stages = OrderedDict(
-        dev="{major}.{minor}.{patch}.dev{n}",
-        beta="{major}.{minor}.{patch}beta{n}",
-        final="{major}.{minor}.{patch}",
-    )
-
-    with mock_patch.object(Version, "_stages", stages):
+def test_comparison_operators(left, right, is_less, is_greater, is_equal, stages):
+    with mock_patch.object(Version, "stages", stages):
         assert (Version(left) < Version(right)) is is_less
         assert (Version(left) > Version(right)) is is_greater
         assert (Version(left) == Version(right)) is is_equal
@@ -322,29 +299,33 @@ def test_comparison_operators(left, right, is_less, is_greater, is_equal):
         assert (Version(left) != Version(right)) is not is_equal
 
 
+@pytest.mark.wip
 @parametrize(
-    "current_version, bump_version_to, expected",
+    "current, bump_to, stage, expected",
     [
-        (None, "0.0.0", "0.0.0"),
-        (None, "7.0.0", "7.0.0"),
-        (None, "0.8.0", "0.8.0"),
-        (None, "0.0.12", "0.0.12"),
-        (None, "major", "1.0.0"),
-        (None, "minor", "0.1.0"),
-        (None, "patch", "0.0.1"),
-        (None, "patch", "0.0.1"),
-        ("0.0.0", "0.0.0", None),
-        ("0.0.1", "0.0.0", None),
-        ("0.0.1", "0.0.2", "0.0.2"),
-        ("4.4.7", "major", "5.0.0"),
-        ("4.4.7", "minor", "4.5.0"),
-        ("4.4.7", "patch", "4.4.8"),
+        ("0.0.0", "major", None, "1.0.0"),
+        ("0.0.0", "minor", None, "0.1.0"),
+        ("0.0.0", "patch", None, "0.0.1"),
+        ("0.0.0", "0.0.0", None, None),
+        ("0.0.1", "0.0.0", None, None),
+        ("0.0.1", "0.0.2", None, "0.0.2"),
+        ("4.4.7", "major", None, "5.0.0"),
+        ("4.4.7", "minor", None, "4.5.0"),
+        ("4.4.7", "patch", None, "4.4.8"),
+        ("4.4.7", "major", "dev", "5.0.0.dev0"),
+        ("4.4.7", "minor", "dev", "4.5.0.dev0"),
+        ("4.4.7", "patch", "dev", "4.4.8.dev0"),
+        ("3.0.0.dev2", None, "beta", "3.0.0beta0"),
+        ("3.0.0beta3", None, "beta", "3.0.0beta4"),
+        ("4.4.7beta3", None, None, "4.4.7"),
+        ("4.4.7", None, None, None),
     ],
 )
-def test_get_next_version(current_version, bump_version_to, expected):
-    current_version = Version(current_version) if current_version else None
-    expected = Version(expected) if expected else None
+def test_get_next_version(current, bump_to, stage, expected, stages):
+    with mock_patch.object(Version, "stages", stages):
+        current = Version(current)
+        expected = Version(expected) if expected else None
 
-    new_version = get_next_version(current_version, bump_version_to)
+        new_version = get_next_version(current, bump_to, stage)
 
-    assert new_version == expected
+        assert new_version == expected
