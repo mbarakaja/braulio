@@ -139,6 +139,7 @@ def test_manual_version_bump(
             current_version=current_version,
             new_version=Version(expected),
             release_data={},
+            remove=ANY,
         )
 
         mock_git.commit.assert_called_with(
@@ -272,6 +273,49 @@ def test_call_to_update_changelog(
             current_version=Version(),
             new_version=mock_get_next_version(),
             release_data=release_data,
+            remove=ANY,
+        )
+
+
+@pytest.mark.wip
+@parametrize(
+    "tags, options, expected",
+    [
+        ([], [], None),
+        ([], ["--merge-pre"], None),
+        ([FakeTag("v1.0.0")], ["--merge-pre"], None),
+        (
+            [FakeTag("v1.1.0beta1"), FakeTag("v1.1.0beta0"), FakeTag("v1.0.0")],
+            ["--merge-pre"],
+            ["1.1.0beta1", "1.0.0"],
+        ),
+        ([FakeTag("v1.1.0beta1"), FakeTag("v1.1.0beta0"), FakeTag("v1.0.0")], [], None),
+    ],
+)
+@patch("braulio.cli.update_chglog", autospec=True)
+@patch("braulio.cli.Git", autospec=True)
+def test_merge_pre_option(
+    MockGit, mock_update_chglog, isolated_filesystem, tags, options, expected
+):
+    mock_git = MockGit()
+    mock_git.tags = tags
+
+    with isolated_filesystem("HISTORY.rst"):
+        path = Path("setup.cfg")
+        path.touch()
+        path.write_text(
+            "[braulio.stages]\n"
+            "beta  = {major}.{minor}.{patch}beta{n}\n"
+            "final = {major}.{minor}.{patch}\n"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["release", "-y"] + options)
+
+        assert result.exit_code == 0
+
+        mock_update_chglog.assert_called_with(
+            ANY, current_version=ANY, new_version=ANY, release_data=ANY, remove=expected
         )
 
 

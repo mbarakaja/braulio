@@ -219,3 +219,21 @@ def commit_analyzer(commits, label_pattern, label_position="footer"):
         semantic_commits.append(sc)
 
     return semantic_commits
+
+
+def tag_analyzer(tags, tag_pattern, Version):
+
+    tag_pattern = re.escape(tag_pattern).replace(r"\{version\}", Version.pattern)
+
+    versions = []
+    tag_regex = re.compile(tag_pattern)
+
+    for tag in tags:
+        match = tag_regex.match(tag.name)
+
+        if match:
+            version = Version(**match.groupdict())
+            version.tag = tag
+            versions.append(version)
+
+    return versions

@@ -347,6 +347,28 @@ def test_update_chglog(
         assert text == expected
 
 
+def test_remove_block_from_changelog(isolated_filesystem):
+    cur_version = Version("1.0.0")
+    new_version = Version("2.0.0")
+
+    with isolated_filesystem:
+        path = Path.cwd() / "CHANGELOG.rst"
+        path.write_text(
+            "line 1\n" "line 2\n" "line 3\n" "line 4\n" "line 5\n" "line 6\n"
+        )
+
+        update_chglog(path, cur_version, new_version, {}, ["line 2", "line 5"])
+
+        text = path.read_text()
+
+        assert "line 1" in text
+        assert "line 2" not in text
+        assert "line 3" not in text
+        assert "line 4" not in text
+        assert "line 5" in text
+        assert "line 6" in text
+
+
 class Test_update_files:
     def test_files_missing_version_string(self, fake_repository):
         paths = ["setup.py", "black/__init__.py"]

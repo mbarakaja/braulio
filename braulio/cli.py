@@ -1,9 +1,8 @@
-import re
 import click
 from pathlib import Path
 from click import style
-from braulio.git import Git, commit_analyzer
-from braulio.version import Version, get_next_version, VERSION_STRING_PATTERN
+from braulio.git import Git, commit_analyzer, tag_analyzer
+from braulio.version import Version, get_next_version
 from braulio.config import Config, update_config_file
 from braulio.files import (
     find_chglog_file,
@@ -175,26 +174,19 @@ def current_version_option_validator(ctx, param, value):
     # Look for the last git tag for the curren version
     git = Git()
     tag_pattern = ctx.params["tag_pattern"]
+    versions = tag_analyzer(git.tags, tag_pattern, Version)
 
+    # User provided current version. Try to find a tag that match it.
     if current_version:
-        tag_pattern = re.escape(tag_pattern.format(version=current_version.string))
-    else:
-        tag_pattern = re.escape(tag_pattern).replace(
-            r"\{version\}", VERSION_STRING_PATTERN
-        )
+        for version in versions:
+            if version == current_version:
+                current_version = version
+                break
+    elif versions:
+        current_version = versions[0]
 
-    tag_regex = re.compile(tag_pattern)
-
-    for tag in git.tags:
-        match = tag_regex.match(tag.name)
-
-        if match:
-            ctx.params["current_tag"] = tag
-
-            if not current_version:
-                current_version = Version(**match.groupdict(default=0))
-
-            break
+    ctx.params["current_tag"] = current_version.tag if current_version else None
+    ctx.params["versions"] = versions
 
     return current_version
 
@@ -293,6 +285,9 @@ def stage_option_validator(ctx, param, value):
 )
 @click.option("--stage", callback=stage_option_validator, help="User-defined stage")
 @click.option(
+    "--merge-pre", flag_value=True, default=False, help="Merge pre-release changelogs."
+)
+@click.option(
     "-y", "confirm_flag", is_flag=True, default=False, help="Don't ask for confirmation"
 )
 @click.argument(
@@ -314,7 +309,9 @@ def release(
     tag_pattern,
     current_version,
     stage,
+    merge_pre,
     current_tag=None,
+    versions=None,
 ):
 
     """Release a new version.
@@ -322,10 +319,26 @@ def release(
     Determines the next version by inspecting commit messages, updates the
     changelog, commit the changes and tag the repository with the new version.
     """
+    # If there isn't a current version, assume version 0.0.0
+    current_version = current_version or Version()
 
     git = Git()
-    current_tag_name = current_tag.name if current_tag else None
-    commit_list = git.log(_from=current_tag_name)
+    from_tag = current_tag.name if current_tag else None
+
+    # Delimiter of the block to be removed from the changelog file
+    remove_pre_chglog = None
+
+    # Look for the last final release version if the user want it
+    if merge_pre and current_version.stage != "final":
+        remove_pre_chglog = [current_version.string]
+
+        for version in versions:
+            if version.stage == "final":
+                from_tag = version.tag.name
+                remove_pre_chglog.append(version.string)
+                break
+
+    commit_list = git.log(_from=from_tag)
 
     msg(f'{label("Current version")} {current_version}')
     msg(f'{label("Commits found")} {len(commit_list)} since last release')
@@ -339,9 +352,6 @@ def release(
     release_data = ReleaseDataTree(semantic_commits)
 
     bump_version_to = None
-
-    # If there isn't a current version, assume version 0.0.0
-    current_version = current_version or Version()
 
     # --bump, --major, --minor, --patch or commit message based version
     # are taken into account only if the current version is in final stage.
@@ -388,6 +398,7 @@ def release(
             new_version=new_version,
             current_version=current_version,
             release_data=release_data,
+            remove=remove_pre_chglog,
         )
 
         msg(check_mark, prefix="")

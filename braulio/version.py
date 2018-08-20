@@ -45,9 +45,13 @@ Stage = namedtuple("Stage", ["label", "serializer"])
 
 class Version:
 
+    pattern = VERSION_STRING_PATTERN
+
     stages = {"final": Stage("final", "{major}.{minor}.{patch}")}
 
     def __init__(self, string=None, major=0, minor=0, patch=0, stage=None, n=0):
+
+        self.tag = None
 
         if string:
             parts = parse_version_string_parts(string)

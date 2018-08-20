@@ -2,7 +2,8 @@ import pytest
 from collections import namedtuple
 from subprocess import CalledProcessError, PIPE
 from unittest.mock import patch
-from braulio.git import _run_command, Git, Commit, Tag, commit_analyzer
+from braulio.git import _run_command, Git, Commit, Tag, commit_analyzer, tag_analyzer
+from braulio.version import Version
 
 
 parametrize = pytest.mark.parametrize
@@ -364,3 +365,20 @@ class Test_commit_analyzer:
             assert lst[0].subject == "Make it work"
             assert lst[0].scope is None
             assert lst[0].action == "fix"
+
+
+@pytest.mark.wip
+def test_tag_analyzer():
+
+    tags = [
+        Tag("2016-10-15   v10.0.1"),
+        Tag("2016-08-26   v0.10.13"),
+        Tag("2016-05-06   save-point"),
+        Tag("2016-04-26   v0.9.7"),
+    ]
+
+    result = tag_analyzer(tags, "v{version}", Version)
+
+    assert result == [Version("10.0.1"), Version("0.10.13"), Version("0.9.7")]
+
+    assert result[0].tag.name == "v10.0.1"

@@ -180,11 +180,29 @@ def _split_chglog(path, title):
     return "".join(top), "".join(bottom)
 
 
-def update_chglog(path, current_version, new_version, release_data):
+def update_chglog(path, current_version, new_version, release_data, remove=None):
     top, bottom = _split_chglog(path, title=current_version.string)
     markup = _render_release(new_version, release_data)
 
     path.write_text(top + markup + bottom)
+
+    if remove:
+        text = ""
+        skip = False
+
+        with path.open() as f:
+            for line in f:
+                skip = skip or line.startswith(remove[0])
+
+                if skip:
+                    if line.startswith(remove[1]):
+                        skip = False
+                    else:
+                        continue
+
+                text += line
+
+        path.write_text(text)
 
 
 version_pattern = re.compile("_?_?version_?_?\s?=\s?(?:'|\")")
