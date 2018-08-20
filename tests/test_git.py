@@ -367,7 +367,6 @@ class Test_commit_analyzer:
             assert lst[0].action == "fix"
 
 
-@pytest.mark.wip
 def test_tag_analyzer():
 
     tags = [

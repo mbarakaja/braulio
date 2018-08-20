@@ -184,7 +184,6 @@ class TestVersion:
             assert new_version == Version(expected)
             assert new_version is not version
 
-    @pytest.mark.wip
     @parametrize(
         "current, bump_part, message",
         [
@@ -299,7 +298,6 @@ def test_comparison_operators(left, right, is_less, is_greater, is_equal, stages
         assert (Version(left) != Version(right)) is not is_equal
 
 
-@pytest.mark.wip
 @parametrize(
     "current, bump_to, stage, expected",
     [

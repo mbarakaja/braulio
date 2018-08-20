@@ -277,7 +277,6 @@ def test_call_to_update_changelog(
         )
 
 
-@pytest.mark.wip
 @parametrize(
     "tags, options, expected",
     [
@@ -697,7 +696,6 @@ def test_update_current_version_config_file_option(
         cfg.read("setup.cfg")
 
 
-@pytest.mark.wip
 @parametrize("value, expected", [("dev", "dev"), ("beta", "b"), ("b", "b")])
 def test_stage_option_validator(ctx, value, expected):
     stages = OrderedDict(
@@ -710,7 +708,6 @@ def test_stage_option_validator(ctx, value, expected):
         assert stage_option_validator(ctx, {}, value) == expected
 
 
-@pytest.mark.wip
 def test_stage_option_validator_with_invalid_value(ctx):
     stages = OrderedDict(
         dev=Stage("dev", "{major}.{minor}.{patch}.dev{n}"),

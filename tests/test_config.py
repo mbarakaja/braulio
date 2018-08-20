@@ -143,7 +143,6 @@ class TestConfig:
             config = Config()
             assert config.message == "Release: {new_version}"
 
-    @pytest.mark.wip
     def test_stages_option(self, isolated_filesystem):
         with isolated_filesystem:
             file_path = Path.cwd() / "setup.cfg"
