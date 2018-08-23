@@ -1,8 +1,8 @@
 History
 =======
 
-0.3.0b0 (2018-08-14)
---------------------
+0.3.0 (2018-08-22)
+------------------
 
 Bug Fixes
 ~~~~~~~~~
@@ -20,6 +20,8 @@ Features
 
 * release
 
+  - Add --merge-pre option
+  - Add --stage option
   - Support pre-release versions
   - Add option to customize the commit message
   - Add option to specify the current version
