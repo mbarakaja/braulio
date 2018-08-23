@@ -141,7 +141,7 @@ class Git:
 class SemanticCommit(NamedTuple):
     subject: str
     message: str
-    action: str
+    type: str
     scope: str
 
 
@@ -153,7 +153,7 @@ def commit_analyzer(commits, label_pattern, label_position="footer"):
     A message convention is determined by ``label_pattern``, which is not a
     regular expression pattern. Instead it must be a string literals with
     placeholders that indicates metadata information in a given position of
-    the commit message. The possible placeholders are ``{action}``, ``{scope}``
+    the commit message. The possible placeholders are ``{type}``, ``{scope}``
     and ``{subject}``.
 
     The ``label_position`` argument dictates where (header|footer) to look in
@@ -169,11 +169,11 @@ def commit_analyzer(commits, label_pattern, label_position="footer"):
 
         fix(cli): Ensure --help option doesn't hang
 
-    The pattern must be ``{action}({scope}): {subject}``, where the metadata
+    The pattern must be ``{type}({scope}): {subject}``, where the metadata
     information extracted will be::
 
         {
-            'action': 'fix',
+            'type': 'fix',
             'scope': 'cli',
             'subject': 'Ensure --help option doesn't hang'
         }
@@ -183,11 +183,11 @@ def commit_analyzer(commits, label_pattern, label_position="footer"):
     pattern_string = re.escape(label_pattern)
 
     # Capturing group patterns
-    action_cgp = r"(?P<action>\w+)"
+    action_cgp = r"(?P<type>\w+)"
     scope_cgp = r"(?P<scope>\w*)"
     subject_cgp = r"(?P<subject>.+)"
 
-    pattern_string = pattern_string.replace(r"\{action\}", action_cgp).replace(
+    pattern_string = pattern_string.replace(r"\{type\}", action_cgp).replace(
         r"\{scope\}", scope_cgp
     )
     if label_position == "header":
@@ -211,7 +211,7 @@ def commit_analyzer(commits, label_pattern, label_position="footer"):
 
         sc = SemanticCommit(
             subject=metadata["subject"].strip(),
-            action=metadata["action"],
+            type=metadata["type"],
             scope=metadata.get("scope") or None,
             message=commit.message,
         )

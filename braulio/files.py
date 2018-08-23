@@ -11,13 +11,13 @@ DEFAULT_CHANGELOG = KNOWN_CHANGELOG_FILES[0]
 
 class ReleaseDataTree(UserDict):
     """Takes a list of :class:`~braulio.git.SemanticCommit` objects, and
-    classify them by type of action (feat, fix, refactor, etc) and then by
+    classify them by type (feat, fix, refactor, etc) and then by
     the scope of the commit.
 
-    This is a dict like class, so, the found actions can be accessed normally
+    This is a dict like class, so, the found commit types can be accessed normally
     by the key name.
 
-    Commits without an specified action are filter out.
+    Commits without an specified type are filter out.
     """
 
     def __init__(self, semantic_commits):
@@ -28,23 +28,23 @@ class ReleaseDataTree(UserDict):
         is_breaking = False
 
         for commit in semantic_commits:
-            if commit.action:
+            if commit.type:
 
                 is_breaking = is_breaking or "BREAKING CHANGE" in commit.message
 
-                action, scope = commit.action, commit.scope
+                _type, scope = commit.type, commit.scope
 
-                if action not in self:
-                    self[action] = {"scopeless": []}
+                if _type not in self:
+                    self[_type] = {"scopeless": []}
 
                 if not scope:
-                    self[action]["scopeless"].append(commit)
+                    self[_type]["scopeless"].append(commit)
                     continue
                 else:
-                    if scope not in self[action]:
-                        self[action][commit.scope] = []
+                    if scope not in self[_type]:
+                        self[_type][commit.scope] = []
 
-                    self[action][scope].append(commit)
+                    self[_type][scope].append(commit)
 
         bump_type = "major" if is_breaking else "minor" if "feat" in self else "patch"
 

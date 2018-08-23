@@ -37,7 +37,7 @@ def test_known_changelog_files():
 class TestReleaseDataTree:
 
     FakeSemanticCommit = namedtuple(
-        "FakeSemanticCommit", ["action", "scope", "message"]
+        "FakeSemanticCommit", ["type", "scope", "message"]
     )
 
     @pytest.mark.parametrize(
@@ -45,24 +45,24 @@ class TestReleaseDataTree:
         [
             (
                 [
-                    FakeSemanticCommit(action="fix", scope=None, message=""),
+                    FakeSemanticCommit(type="fix", scope=None, message=""),
                     FakeSemanticCommit(
-                        action="refactor", scope=None, message="BREAKING CHANGES"
+                        type="refactor", scope=None, message="BREAKING CHANGES"
                     ),
                 ],
                 "major",
             ),
             (
                 [
-                    FakeSemanticCommit(action="fix", scope=None, message=""),
-                    FakeSemanticCommit(action="feat", scope=None, message=""),
+                    FakeSemanticCommit(type="fix", scope=None, message=""),
+                    FakeSemanticCommit(type="feat", scope=None, message=""),
                 ],
                 "minor",
             ),
             (
                 [
-                    FakeSemanticCommit(action="fix", scope=None, message=""),
-                    FakeSemanticCommit(action="refactor", scope=None, message=""),
+                    FakeSemanticCommit(type="fix", scope=None, message=""),
+                    FakeSemanticCommit(type="refactor", scope=None, message=""),
                 ],
                 "patch",
             ),
@@ -76,7 +76,7 @@ class TestReleaseDataTree:
 
     def test_commit_grouping_by_action_and_scope(self, commit_list):
         semantic_commits = commit_analyzer(
-            commit_list, label_pattern="!{action}:{scope}"
+            commit_list, label_pattern="!{type}:{scope}"
         )
         release_data = ReleaseDataTree(semantic_commits)
 
@@ -240,7 +240,7 @@ class Test_render_release:
     def test_release_with_fixes_and_features(self, commit_list):
         version = Version(major=10, minor=3, patch=0)
         semantic_commits = commit_analyzer(
-            commit_list, label_pattern="!{action}:{scope}"
+            commit_list, label_pattern="!{type}:{scope}"
         )
         release_data = ReleaseDataTree(semantic_commits)
         markup = _render_release(version, release_data=release_data)
@@ -262,7 +262,7 @@ class Test_render_release:
 
     def test_release_with_fixes(self, commit_registry):
         semantic_commits = commit_analyzer(
-            [commit_registry["4d17c1a"]], label_pattern="!{action}:{scope}"
+            [commit_registry["4d17c1a"]], label_pattern="!{type}:{scope}"
         )
         release_data = ReleaseDataTree(semantic_commits)
         version = Version(major=10, minor=3, patch=0)
@@ -282,7 +282,7 @@ class Test_render_release:
         version = Version(major=10, minor=3, patch=0)
         semantic_commits = commit_analyzer(
             [reg["ccaa185"], reg["bc0bcab"], reg["a6b655f"]],
-            label_pattern="!{action}:{scope}",
+            label_pattern="!{type}:{scope}",
         )
         release_data = ReleaseDataTree(semantic_commits)
         markup = _render_release(version, release_data=release_data)

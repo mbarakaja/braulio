@@ -193,9 +193,9 @@ def current_version_option_validator(ctx, param, value):
 
 def label_pattern_option_validator(ctx, param, value):
     """Checks that a given string has all the required placeholders. The
-    possible placeholders are **{action}**, **{scope}** and **{subject}**.
+    possible placeholders are **{type}**, **{scope}** and **{subject}**.
 
-    ``{action}`` are always required, ``{scope}`` is optional and
+    ``{type}`` are always required, ``{scope}`` is optional and
     ``{subject}`` are required only when ``label_position`` option is set to
     ``header``.
 
@@ -205,8 +205,8 @@ def label_pattern_option_validator(ctx, param, value):
     missings = []
     label_position = ctx.params["label_position"]
 
-    if "{action}" not in value:
-        missings.append(style("{action}", fg="red", bold=True))
+    if "{type}" not in value:
+        missings.append(style("{type}", fg="red", bold=True))
 
     if label_position == "header" and "{subject}" not in value:
         missings.append(style("{subject}", fg="red", bold=True))

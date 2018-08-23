@@ -15,7 +15,7 @@ DEFAULT_CONFIG.read_dict(
             "confirm": "False",
             "changelog_file": DEFAULT_CHANGELOG,
             "files": "",
-            "label_pattern": "!{action}:{scope}",
+            "label_pattern": "!{type}:{scope}",
             "label_position": "footer",
             "tag_pattern": "v{version}",
         },

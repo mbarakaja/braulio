@@ -18,7 +18,7 @@ class TestConfig:
         assert config.files == ()
         assert config.changelog_file == Path("HISTORY.rst")
         assert config.label_position == "footer"
-        assert config.label_pattern == "!{action}:{scope}"
+        assert config.label_pattern == "!{type}:{scope}"
         assert config.tag_pattern == "v{version}"
         assert config.current_version is None
         assert config.stages == {"final": "{major}.{minor}.{patch}"}

@@ -283,10 +283,10 @@ class Test_commit_analyzer:
     @parametrize(
         "label_pattern, header",
         [
-            ("!{action}:{scope} {subject}", "!fix:cli Make it work"),
-            ("[{action}:{scope}] {subject}", "[fix:cli] Make it work"),
-            ("{action}({scope}): {subject}", "fix(cli): Make it work"),
-            ("{action}({scope}): {subject}", "fix(cli): Make it work"),
+            ("!{type}:{scope} {subject}", "!fix:cli Make it work"),
+            ("[{type}:{scope}] {subject}", "[fix:cli] Make it work"),
+            ("{type}({scope}): {subject}", "fix(cli): Make it work"),
+            ("{type}({scope}): {subject}", "fix(cli): Make it work"),
         ],
     )
     def test_label_in_header(self, isolated_filesystem, label_pattern, header):
@@ -302,15 +302,15 @@ class Test_commit_analyzer:
             assert len(lst) == 1
             assert lst[0].subject == "Make it work"
             assert lst[0].scope == "cli"
-            assert lst[0].action == "fix"
+            assert lst[0].type == "fix"
 
     @parametrize(
         "label_pattern, footer",
         [
-            ("!{action}:{scope}", "!fix:cli"),
-            ("[{action}:{scope}]", "[fix:cli]"),
-            ("{action}({scope}):", "fix(cli):"),
-            ("{action}({scope})", "fix(cli) Fixes #45 and closes #67"),
+            ("!{type}:{scope}", "!fix:cli"),
+            ("[{type}:{scope}]", "[fix:cli]"),
+            ("{type}({scope}):", "fix(cli):"),
+            ("{type}({scope})", "fix(cli) Fixes #45 and closes #67"),
         ],
     )
     def test_label_in_the_footer(self, isolated_filesystem, label_pattern, footer):
@@ -326,14 +326,14 @@ class Test_commit_analyzer:
             assert len(lst) == 1
             assert lst[0].subject == "Make it work"
             assert lst[0].scope == "cli"
-            assert lst[0].action == "fix"
+            assert lst[0].type == "fix"
 
     @parametrize(
         "label_pattern, header",
         [
-            ("!{action}:{scope} {subject}", "!fix: Make it work"),
-            ("[{action}:{scope}] {subject}", "[fix:] Make it work"),
-            ("{action}({scope}): {subject}", "fix(): Make it work"),
+            ("!{type}:{scope} {subject}", "!fix: Make it work"),
+            ("[{type}:{scope}] {subject}", "[fix:] Make it work"),
+            ("{type}({scope}): {subject}", "fix(): Make it work"),
         ],
     )
     def test_scopeless_labels(self, isolated_filesystem, label_pattern, header):
@@ -349,7 +349,7 @@ class Test_commit_analyzer:
             assert len(lst) == 1
             assert lst[0].subject == "Make it work"
             assert lst[0].scope is None
-            assert lst[0].action == "fix"
+            assert lst[0].type == "fix"
 
     def test_scopeless_label_pattern(self, isolated_filesystem):
 
@@ -358,13 +358,13 @@ class Test_commit_analyzer:
         with isolated_filesystem:
 
             lst = commit_analyzer(
-                [commit], label_pattern="!{action}", label_position="footer"
+                [commit], label_pattern="!{type}", label_position="footer"
             )
 
             assert len(lst) == 1
             assert lst[0].subject == "Make it work"
             assert lst[0].scope is None
-            assert lst[0].action == "fix"
+            assert lst[0].type == "fix"
 
 
 def test_tag_analyzer():

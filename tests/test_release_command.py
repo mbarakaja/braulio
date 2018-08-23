@@ -257,7 +257,7 @@ def test_call_to_update_changelog(
         mock_git.log.assert_called()
 
         mock_commit_analyzer.assert_called_with(
-            mock_git.log(), "!{action}:{scope}", "footer"
+            mock_git.log(), "!{type}:{scope}", "footer"
         )
 
         MockReleaseDataTree.assert_called_with(mock_commit_analyzer())
@@ -460,7 +460,7 @@ def test_output_before_confirmation_prompt(
     [
         ("header", ""),
         ("header", "{subject}"),
-        ("header", "{action}:{scope}"),
+        ("header", "{type}:{scope}"),
         ("footer", "{subject}"),
     ],
 )
@@ -474,8 +474,8 @@ def test_invalid_label_pattern_option(ctx, label_position, value):
 @parametrize(
     "cfg, option",
     [
-        ({"label_pattern": "{action}:{scope}"}, []),
-        ({}, ["--label-pattern={action}:{scope}"]),
+        ({"label_pattern": "{type}:{scope}"}, []),
+        ({}, ["--label-pattern={type}:{scope}"]),
     ],
 )
 @patch("braulio.cli.commit_analyzer", autospec=True)
@@ -491,7 +491,7 @@ def test_label_pattern_option(
 
         assert result.exit_code == 0
         mock_commit_analyzer.assert_called_with(
-            MockGit().log(), "{action}:{scope}", "footer"
+            MockGit().log(), "{type}:{scope}", "footer"
         )
 
 
