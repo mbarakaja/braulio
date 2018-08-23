@@ -109,7 +109,7 @@ version will be the next.
 Manual version bump
 -------------------
 
-There are 4 options through the command line interfase;
+There are 4 options through the command line interface;
 :ref:`--patch <option-patch>`, :ref:`--minor <option-minor>`,
 :ref:`--major <option-major>` and :ref:`--bump <option-bump>`.
 
