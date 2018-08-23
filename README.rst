@@ -8,6 +8,9 @@ Braulio
 .. image:: https://img.shields.io/travis/mbarakaja/braulio.svg
         :target: https://travis-ci.org/mbarakaja/braulio
 
+.. image:: https://ci.appveyor.com/api/projects/status/dtf3v3m4gchrnt6b?svg=true
+        :target: https://ci.appveyor.com/project/mbarakaja/braulio
+
 .. image:: https://readthedocs.org/projects/braulio/badge/?version=latest
         :target: https://braulio.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
