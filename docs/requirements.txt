@@ -29,7 +29,7 @@ pyparsing==2.2.0
 pytest==3.7.2
 pytest-runner==4.2
 pytz==2018.5
-PyYAML==4.2b4
+PyYAML==5.4
 requests==2.20.0
 requests-toolbelt==0.8.0
 six==1.11.0
